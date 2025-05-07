@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Web Bluetooth Example</title>
+</head>
+<body>
+	<button id="connect-button">连接</button>
+	<div id="device_name"></div>
+	<div id="current_voltage"></div>
+	<div id="current_time"></div>
+	<div id="system_time"></div>
+
+	<script src="log.js"></script>
+
+	<script>
+		var connected = false;
+		var device = null;
+
+		function formatTime(year, month, mday, hour, min, sec) {
+			month += 1;
+			if(month<10) month = '0'+month;
+			if(mday<10)  mday  = '0'+mday;
+			if(hour<10)  hour  = '0'+hour;
+			if(min<10)   min   = '0'+min;
+			if(sec<10)   sec   = '0'+sec;
+			return year+"-"+month+"-"+mday+" "+hour+":"+min+":"+sec+" ";
+		}
+
+		function onClick() {
+			if(connected) {
+				disconnect();
+			}else{
+				connectToDevice();
+			}
+		}
+
+		async function connectToDevice() {
+			try {
+				console.log('请求设备...');
+				device = await navigator.bluetooth.requestDevice({
+					filters: [{ namePrefix: "DLG"}]
+					, optionalServices: ['18424398-7cbc-11e9-8f9e-2a86e4085a59']
+				});
+				console.log('device: ', device.name);
+				document.getElementById('device_name').textContent = "设备名: "+device.name;
+				device.ongattserverdisconnected = onDisconnect;
+
+				var server = await device.gatt.connect();
+				console.log('设备已连接!');
+
+				var service = await server.getPrimaryService('18424398-7cbc-11e9-8f9e-2a86e4085a59');
+				console.log('获得service: ', service.uuid);
+
+				var ctrlPoint = await service.getCharacteristic('2d86686a-53dc-25b3-0c4a-f0e10c8dee20');
+				var adc1Value = await service.getCharacteristic('15005991-b131-3396-014c-664c9867b917');
+				var longValue = await service.getCharacteristic('772ae377-b3d2-4f8e-4042-5481d1e0098c');
+
+				cur_voltage = await adc1Value.readValue();
+				console.log('cur_voltage:', cur_voltage);
+				document.getElementById('current_voltage').textContent = "当前电压: "+cur_voltage.getUint16(0, true);
+
+				var year, month, mday, wday, hour, minute, second;
+				cur_time = await longValue.readValue();
+				year   = cur_time.getUint16(0, true);
+				month  = cur_time.getUint8(2);
+				mday   = cur_time.getUint8(3);
+				hour   = cur_time.getUint8(4);
+				minute = cur_time.getUint8(5);
+				second = cur_time.getUint8(6);
+
+				document.getElementById('current_time').textContent = "当前时间: "+formatTime(year, month, mday, hour, minute, second);
+
+				var buf = new Uint8Array(10);
+				var today = new Date();
+				year = today.getFullYear();
+				month = today.getMonth();
+				mday = today.getDate();
+				wday = today.getDay();
+				hour = today.getHours();
+				minute = today.getMinutes();
+				second = today.getSeconds();
+				console.log('today:',today);
+				buf[0] = 0x91;
+				buf[1] = year%256;
+				buf[2] = year/256;
+				buf[3] = month;
+				buf[4] = mday;
+				buf[5] = hour;
+				buf[6] = minute;
+				buf[7] = second;
+				buf[8] = wday;
+				buf[9] = 0;
+				await longValue.writeValue(buf);
+
+				document.getElementById('system_time').textContent = "系统时间: "+formatTime(year, month, mday, hour, minute, second);
+
+				connected = true;
+				document.getElementById('connect-button').textContent = "断开";
+
+				console.log('同步时间成功!');
+			} catch (error) {
+				console.log('连接失败:', error);
+				disconnect();
+			}
+		}
+
+		function disconnect() {
+			if(!device)
+				return;
+			if(device.gatt.connected){
+				device.gatt.disconnect();
+			}
+			onDisconnect();
+		}
+
+		function onDisconnect() {
+			device = null;
+			console.log('设备已断开连接');
+			connected = false;
+			document.getElementById('connect-button').textContent = "连接";
+		}
+
+		document.getElementById('connect-button').addEventListener('click', onClick);
+	</script>
+</body>
+</html>
+
+
