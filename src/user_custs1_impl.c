@@ -58,6 +58,7 @@
 ke_msg_id_t timer_used      __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
 uint16_t indication_counter __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
 uint16_t non_db_val_counter __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
+int adcval;
 
 /*
  * FUNCTION DEFINITIONS
@@ -67,18 +68,18 @@ uint16_t non_db_val_counter __SECTION_ZERO("retention_mem_area0"); //@RETENTION 
 int adc1_update(void)
 {
 	adc_offset_calibrate(ADC_INPUT_MODE_SINGLE_ENDED);
-	int adcval = adc_get_vbat_sample(false);
-	adcval = (adcval*225)>>7;
+	adcval = adc_get_vbat_sample(false);
+	int volt = (adcval*225)>>7;
 
 	struct custs1_val_set_req *req = KE_MSG_ALLOC_DYN(CUSTS1_VAL_SET_REQ, prf_get_task_from_id(TASK_ID_CUSTS1), TASK_APP, custs1_val_set_req, DEF_SVC1_ADC_VAL_1_CHAR_LEN);
 	req->conidx = app_env->conidx;
 	req->handle = SVC1_IDX_ADC_VAL_1_VAL;
 	req->length = DEF_SVC1_ADC_VAL_1_CHAR_LEN;
-	req->value[0] = adcval&0xff;
-	req->value[1] = adcval>>8;
+	req->value[0] = volt&0xff;
+	req->value[1] = volt>>8;
 	KE_MSG_SEND(req);
 	
-	return adcval;
+	return volt;
 }
 
 
@@ -145,7 +146,7 @@ void clock_set(uint8_t *buf)
 	hour   = buf[5];
 	minute = buf[6];
 	second = buf[7];
-	wday   = buf[8];
+	wday   = buf[8]-1;
 }
 
 
@@ -177,6 +178,50 @@ void clock_print(void)
 
 /****************************************************************************************/
 
+static uint8_t batt_cal(uint16_t adc_sample)
+{
+    uint8_t batt_lvl;
+
+    if (adc_sample > 1705)
+        batt_lvl = 100;
+    else if (adc_sample <= 1705 && adc_sample > 1584)
+        batt_lvl = 28 + (uint8_t)(( ( ((adc_sample - 1584) << 16) / (1705 - 1584) ) * 72 ) >> 16) ;
+    else if (adc_sample <= 1584 && adc_sample > 1360)
+        batt_lvl = 4 + (uint8_t)(( ( ((adc_sample - 1360) << 16) / (1584 - 1360) ) * 24 ) >> 16) ;
+    else if (adc_sample <= 1360 && adc_sample > 1136)
+        batt_lvl = (uint8_t)(( ( ((adc_sample - 1136) << 16) / (1360 - 1136) ) * 4 ) >> 16) ;
+    else
+        batt_lvl = 0;
+
+    return batt_lvl;
+}
+
+static void draw_batt(void)
+{
+	int p = batt_cal(adcval);
+	p /= 10;
+
+	draw_rect(190, 8, 202, 14, BLACK);
+	draw_box(188, 10, 189, 12, BLACK);
+
+	draw_box(201-p, 9, 201, 13, BLACK);
+}
+
+static void draw_bt(int x, int y)
+{
+	int i;
+
+	draw_vline(x, y-4, y+4, BLACK);
+	
+	for(i=0; i<5; i++){
+		draw_pixel(x-2+i, y-2+i, BLACK);
+		draw_pixel(x-2+i, y+2-i, BLACK);
+	}
+	draw_pixel(x+1, y-3, BLACK);
+	draw_pixel(x+1, y+3, BLACK);
+}
+
+
 char *wday_str[] = {"一", "二", "三", "四", "五", "六", "日"};
 
 void clock_draw(int full)
@@ -188,6 +233,9 @@ void clock_draw(int full)
 	memset(fb_bw, 0xff, scr_h*line_bytes);
 	memset(fb_rr, 0x00, scr_h*line_bytes);
 
+	draw_batt();
+	draw_bt(180, 11);
+	
 	select_font(1);
 	sprintf(tbuf, "%02d:%02d", hour, minute);
 	draw_text(12, 20, tbuf, BLACK);
