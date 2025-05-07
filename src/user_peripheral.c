@@ -75,57 +75,13 @@ struct mnf_specific_data_ad_structure
 
 uint8_t app_connection_idx                      __SECTION_ZERO("retention_mem_area0");
 timer_hnd app_clock_timer_used                  __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
-timer_hnd app_adv_data_update_timer_used        __SECTION_ZERO("retention_mem_area0");
 timer_hnd app_param_update_request_timer_used   __SECTION_ZERO("retention_mem_area0");
-
-// Retained variables
-struct mnf_specific_data_ad_structure mnf_data  __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
-// Index of manufacturer data in advertising data or scan response data (when MSB is 1)
-uint8_t mnf_data_index                          __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
-uint8_t stored_adv_data_len                     __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
-uint8_t stored_scan_rsp_data_len                __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
-uint8_t stored_adv_data[ADV_DATA_LEN]           __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
-uint8_t stored_scan_rsp_data[SCAN_RSP_DATA_LEN] __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
 
 /*
  * FUNCTION DEFINITIONS
  ****************************************************************************************
 */
 
-/**
- ****************************************************************************************
- * @brief Initialize Manufacturer Specific Data
- ****************************************************************************************
- */
-static void mnf_data_init()
-{
-    mnf_data.ad_structure_size = sizeof(struct mnf_specific_data_ad_structure ) - sizeof(uint8_t); // minus the size of the ad_structure_size field
-    mnf_data.ad_structure_type = GAP_AD_TYPE_MANU_SPECIFIC_DATA;
-    mnf_data.company_id[0] = APP_AD_MSD_COMPANY_ID & 0xFF; // LSB
-    mnf_data.company_id[1] = (APP_AD_MSD_COMPANY_ID >> 8 )& 0xFF; // MSB
-    mnf_data.proprietary_data[0] = 0;
-    mnf_data.proprietary_data[1] = 0;
-}
-
-/**
- ****************************************************************************************
- * @brief Update Manufacturer Specific Data
- ****************************************************************************************
- */
-static void mnf_data_update()
-{
-    uint16_t data;
-
-    data = mnf_data.proprietary_data[0] | (mnf_data.proprietary_data[1] << 8);
-    data += 1;
-    mnf_data.proprietary_data[0] = data & 0xFF;
-    mnf_data.proprietary_data[1] = (data >> 8) & 0xFF;
-
-    if (data == 0xFFFF) {
-         mnf_data.proprietary_data[0] = 0;
-         mnf_data.proprietary_data[1] = 0;
-    }
-}
 
 /**
  ****************************************************************************************
@@ -147,64 +103,25 @@ static void app_add_ad_struct(struct gapm_start_advertise_cmd *cmd, void *ad_str
     {
         // Append manufacturer data to advertising data
         memcpy(&cmd->info.host.adv_data[cmd->info.host.adv_data_len], ad_struct_data, ad_struct_len);
-
         // Update Advertising Data Length
         cmd->info.host.adv_data_len += ad_struct_len;
 
-        // Store index of manufacturer data which are included in the advertising data
-        mnf_data_index = cmd->info.host.adv_data_len - sizeof(struct mnf_specific_data_ad_structure);
     }
     else if ((SCAN_RSP_DATA_LEN - cmd->info.host.scan_rsp_data_len) >= ad_struct_len)
     {
         // Append manufacturer data to scan response data
         memcpy(&cmd->info.host.scan_rsp_data[cmd->info.host.scan_rsp_data_len], ad_struct_data, ad_struct_len);
-
         // Update Scan Response Data Length
         cmd->info.host.scan_rsp_data_len += ad_struct_len;
 
-        // Store index of manufacturer data which are included in the scan response data
-        mnf_data_index = cmd->info.host.scan_rsp_data_len - sizeof(struct mnf_specific_data_ad_structure);
-        // Mark that manufacturer data is in scan response and not advertising data
-        mnf_data_index |= 0x80;
     }
     else
     {
         // Manufacturer Specific Data do not fit in either Advertising Data or Scan Response Data
         ASSERT_WARNING(0);
     }
-    // Store advertising data length
-    stored_adv_data_len = cmd->info.host.adv_data_len;
-    // Store advertising data
-    memcpy(stored_adv_data, cmd->info.host.adv_data, stored_adv_data_len);
-    // Store scan response data length
-    stored_scan_rsp_data_len = cmd->info.host.scan_rsp_data_len;
-    // Store scan_response data
-    memcpy(stored_scan_rsp_data, cmd->info.host.scan_rsp_data, stored_scan_rsp_data_len);
 }
 
-/**
- ****************************************************************************************
- * @brief Advertisement data update timer callback function.
- ****************************************************************************************
-*/
-static void adv_data_update_timer_cb()
-{
-	printk("adv_data_update_timer_cb!\n");
-    // If mnd_data_index has MSB set, manufacturer data is stored in scan response
-    uint8_t *mnf_data_storage = (mnf_data_index & 0x80) ? stored_scan_rsp_data : stored_adv_data;
-
-    // Update manufacturer data
-    mnf_data_update();
-
-    // Update the selected fields of the advertising data (manufacturer data)
-    memcpy(mnf_data_storage + (mnf_data_index & 0x7F), &mnf_data, sizeof(struct mnf_specific_data_ad_structure));
-
-    // Update advertising data on the fly
-    app_easy_gap_update_adv_data(stored_adv_data, stored_adv_data_len, stored_scan_rsp_data, stored_scan_rsp_data_len);
-
-    // Restart timer for the next advertising update
-    app_adv_data_update_timer_used = app_easy_timer(APP_ADV_DATA_UPDATE_TO, adv_data_update_timer_cb);
-}
 
 /**
  ****************************************************************************************
@@ -227,15 +144,6 @@ void user_app_init(void)
 
 	adv_count = 0;
 	epd_hw_init(0x23200700, 0x05210006);  // for 2.13 board BW
-
-    // Initialize Manufacturer Specific Data
-    mnf_data_init();
-    
-    // Initialize Advertising and Scan Response Data
-    memcpy(stored_adv_data, USER_ADVERTISE_DATA, USER_ADVERTISE_DATA_LEN);
-    stored_adv_data_len = USER_ADVERTISE_DATA_LEN;
-    memcpy(stored_scan_rsp_data, USER_ADVERTISE_SCAN_RESPONSE_DATA, USER_ADVERTISE_SCAN_RESPONSE_DATA_LEN);
-    stored_scan_rsp_data_len = USER_ADVERTISE_SCAN_RESPONSE_DATA_LEN;
     
     default_app_on_init();
 }
