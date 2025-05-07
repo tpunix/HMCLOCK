@@ -226,7 +226,7 @@ void user_svc1_long_val_wr_ind_handler(ke_msg_id_t const msgid, struct custs1_va
 	printk("Long value: %d\n", param->length);
 	if(param->value[0]==0x91){
 		clock_set((uint8_t*)param->value);
-		clock_draw(1);
+//		clock_draw(1);
 		clock_print();
 	}
 }
