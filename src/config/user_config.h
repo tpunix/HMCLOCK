@@ -186,10 +186,7 @@ static const struct advertise_configuration user_adv_conf = {
 /// Advertising data
 #define USER_ADVERTISE_DATA         ("\x03"\
                                     ADV_TYPE_COMPLETE_LIST_16BIT_SERVICE_IDS\
-                                    ADV_UUID_DEVICE_INFORMATION_SERVICE\
-                                    "\x11"\
-                                    ADV_TYPE_COMPLETE_LIST_128BIT_SERVICE_IDS\
-                                    "\x59\x5A\x08\xE4\x86\x2A\x9E\x8F\xE9\x11\xBC\x7C\x98\x43\x42\x18")
+                                    "\x00\xff")
 
 /// Advertising data length - maximum 28 bytes, 3 bytes are reserved to set
 #define USER_ADVERTISE_DATA_LEN               (sizeof(USER_ADVERTISE_DATA)-1)

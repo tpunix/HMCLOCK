@@ -40,8 +40,8 @@
 			try {
 				console.log('请求设备...');
 				device = await navigator.bluetooth.requestDevice({
-					filters: [{ namePrefix: "DLG"}]
-					, optionalServices: ['18424398-7cbc-11e9-8f9e-2a86e4085a59']
+					filters: [{ namePrefix: "DLG-CLOCK"}]
+					, optionalServices: [ 0xff00 ]
 				});
 				console.log('device: ', device.name);
 				document.getElementById('device_name').textContent = "设备名: "+device.name;
@@ -50,12 +50,12 @@
 				var server = await device.gatt.connect();
 				console.log('设备已连接!');
 
-				var service = await server.getPrimaryService('18424398-7cbc-11e9-8f9e-2a86e4085a59');
+				var service = await server.getPrimaryService( 0xff00 );
 				console.log('获得service: ', service.uuid);
 
-				var ctrlPoint = await service.getCharacteristic('2d86686a-53dc-25b3-0c4a-f0e10c8dee20');
-				var adc1Value = await service.getCharacteristic('15005991-b131-3396-014c-664c9867b917');
-				var longValue = await service.getCharacteristic('772ae377-b3d2-4f8e-4042-5481d1e0098c');
+				var ctrlPoint = await service.getCharacteristic( 0xff03 );
+				var adc1Value = await service.getCharacteristic( 0xff02 );
+				var longValue = await service.getCharacteristic( 0xff01 );
 
 				cur_voltage = await adc1Value.readValue();
 				console.log('cur_voltage:', cur_voltage);
@@ -81,7 +81,7 @@
 				hour = today.getHours();
 				minute = today.getMinutes();
 				second = today.getSeconds();
-				console.log('today:',today);
+				console.log('today:',today, 'wday:', wday);
 				buf[0] = 0x91;
 				buf[1] = year%256;
 				buf[2] = year/256;
