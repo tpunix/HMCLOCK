@@ -292,20 +292,35 @@ void user_app_on_db_init_complete( void )
 
 void user_app_adv_start(void)
 {
-    // Schedule the next advertising data update
-    //app_adv_data_update_timer_used = app_easy_timer(APP_ADV_DATA_UPDATE_TO, adv_data_update_timer_cb);
-    
-    struct gapm_start_advertise_cmd* cmd;
-    cmd = app_easy_gap_undirected_advertise_get_active();
-    
-    // Add manufacturer data to initial advertising or scan response data, if there is enough space
-    app_add_ad_struct(cmd, &mnf_data, sizeof(struct mnf_specific_data_ad_structure), 1);
+	u32 ba0 = *(volatile u32*)(0x40000024);
+	u32 ba1 = *(volatile u32*)(0x40000028);
+	char adv_name[20];
+	
+	ba1 = (ba1<<8)|(ba0>>24);
+	ba0 &= 0x00ffffff;
+	ba0 ^= ba1;
+
+	u8 *ba = (u8*)&ba0;
+	sprintf(adv_name+2, "DLG-CLOCK-%02x%02x%02x", ba[2], ba[1], ba[0]);
+	int name_len = strlen(adv_name+2);
+	
+	if(device_info.dev_name.length==0){
+		device_info.dev_name.length = name_len;
+		memcpy(device_info.dev_name.name, adv_name+2, name_len);
+	}
+
+	adv_name[0] = name_len+1;
+	adv_name[1] = GAP_AD_TYPE_COMPLETE_NAME;
+
+    struct gapm_start_advertise_cmd* cmd = app_easy_gap_undirected_advertise_get_active();
+	app_add_ad_struct(cmd, adv_name, name_len+2, 1);
 
 	//default_advertise_operation();
     //app_easy_gap_undirected_advertise_start();
 	app_easy_gap_undirected_advertise_with_timeout_start(user_default_hnd_conf.advertise_period, NULL);
-	printk("\nuser_app_adv_start!\n");
+	printk("\nuser_app_adv_start! %s\n", adv_name+2);
 }
+
 
 void user_app_connection(uint8_t connection_idx, struct gapc_connection_req_ind const *param)
 {
