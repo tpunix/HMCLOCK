@@ -143,8 +143,13 @@ void user_app_init(void)
 	app_clock_timer_used = EASY_TIMER_INVALID_TIMER;
 
 	adv_count = 0;
+	fspi_config(0x00030605);
 	epd_hw_init(0x23200700, 0x05210006);  // for 2.13 board BW
-    
+
+	fspi_init();
+	int id = sf_readid();
+	printk("Flash ID: %08x\n", id);
+
     default_app_on_init();
 }
 

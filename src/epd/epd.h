@@ -17,11 +17,12 @@ int gpio_get(int index);
 
 
 // spi flash
-int fspi_init(u32 gpio_word);
-int epcs_readid(void);
-int epcs_sector_erase(int addr);
-int epcs_page_write(int addr, u8 *buf, int size);
-int epcs_read(int addr, int len, u8 *buf);
+int fspi_config(u32 gpio_word);
+int fspi_init(void);
+int sf_readid(void);
+int sf_sector_erase(int addr);
+int sf_page_write(int addr, u8 *buf, int size);
+int sf_read(int addr, int len, u8 *buf);
 
 // epd_hw
 void epd_hw_init(u32 config0, u32 config1);
