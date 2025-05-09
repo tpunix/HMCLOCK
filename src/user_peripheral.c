@@ -51,6 +51,7 @@
 #include "user_custs1_impl.h"
 #include "user_custs1_def.h"
 #include "co_bt.h"
+#include "hw_otpc.h"
 
 #include "epd.h"
 
@@ -135,10 +136,48 @@ static void param_update_request_timer_cb()
 }
 
 static int adv_count;
+int otp_btaddr[2];
+int otp_boot;
+char adv_name[20];
+
+static void read_otp_value(void)
+{
+	hw_otpc_init();
+	hw_otpc_manual_read_on(false);
+	
+	otp_boot = *(u32*)(0x07f8fe00);
+	otp_btaddr[0] = *(u32*)(0x07f8ffa8);
+	otp_btaddr[1] = *(u32*)(0x07f8ffac);
+	
+	hw_otpc_disable();
+
+	u32 ba0 = otp_btaddr[0];
+	u32 ba1 = otp_btaddr[1];
+
+	ba1 = (ba1<<8)|(ba0>>24);
+	ba0 &= 0x00ffffff;
+	ba0 ^= ba1;
+
+	u8 *ba = (u8*)&ba0;
+	sprintf(adv_name+2, "DLG-CLOCK-%02x%02x%02x", ba[2], ba[1], ba[0]);
+	int name_len = strlen(adv_name+2);
+	
+	if(device_info.dev_name.length==0){
+		device_info.dev_name.length = name_len;
+		memcpy(device_info.dev_name.name, adv_name+2, name_len);
+	}
+
+	adv_name[0] = name_len+1;
+	adv_name[1] = GAP_AD_TYPE_COMPLETE_NAME;
+}
+
+extern int Region$$Table$$Base;
 
 void user_app_init(void)
 {
-	printk("\n\nuser_app_init!\n");
+	read_otp_value();
+
+	printk("\n\nuser_app_init! %s\n", __TIME__);
     app_param_update_request_timer_used = EASY_TIMER_INVALID_TIMER;
 	app_clock_timer_used = EASY_TIMER_INVALID_TIMER;
 
@@ -146,9 +185,7 @@ void user_app_init(void)
 	fspi_config(0x00030605);
 	epd_hw_init(0x23200700, 0x05210006);  // for 2.13 board BW
 
-	fspi_init();
-	int id = sf_readid();
-	printk("Flash ID: %08x\n", id);
+	selflash(otp_boot);
 
     default_app_on_init();
 }
@@ -205,28 +242,8 @@ void user_app_on_db_init_complete( void )
 
 void user_app_adv_start(void)
 {
-	u32 ba0 = *(volatile u32*)(0x40000024);
-	u32 ba1 = *(volatile u32*)(0x40000028);
-	char adv_name[20];
-	
-	ba1 = (ba1<<8)|(ba0>>24);
-	ba0 &= 0x00ffffff;
-	ba0 ^= ba1;
-
-	u8 *ba = (u8*)&ba0;
-	sprintf(adv_name+2, "DLG-CLOCK-%02x%02x%02x", ba[2], ba[1], ba[0]);
-	int name_len = strlen(adv_name+2);
-	
-	if(device_info.dev_name.length==0){
-		device_info.dev_name.length = name_len;
-		memcpy(device_info.dev_name.name, adv_name+2, name_len);
-	}
-
-	adv_name[0] = name_len+1;
-	adv_name[1] = GAP_AD_TYPE_COMPLETE_NAME;
-
     struct gapm_start_advertise_cmd* cmd = app_easy_gap_undirected_advertise_get_active();
-	app_add_ad_struct(cmd, adv_name, name_len+2, 1);
+	app_add_ad_struct(cmd, adv_name, adv_name[0]+1, 1);
 
 	//default_advertise_operation();
     //app_easy_gap_undirected_advertise_start();

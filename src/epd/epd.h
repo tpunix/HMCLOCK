@@ -17,12 +17,15 @@ int gpio_get(int index);
 
 
 // spi flash
+#define ERASE_4K   0x20
+#define ERASE_32K  0x52
 int fspi_config(u32 gpio_word);
 int fspi_init(void);
 int sf_readid(void);
-int sf_sector_erase(int addr);
+int sf_sector_erase(int cmd, int addr, int wait);
 int sf_page_write(int addr, u8 *buf, int size);
 int sf_read(int addr, int len, u8 *buf);
+int selflash(int otp_boot);
 
 // epd_hw
 void epd_hw_init(u32 config0, u32 config1);
