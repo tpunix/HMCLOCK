@@ -114,20 +114,23 @@ int sf_readid(void)
 	return __REV(id);
 }
 
-int sf_status(void)
+int sf_status(int id)
 {
 	int status;
+	int cmd = (id)? 0x3500 : 0x0500;
 
 	fspi_set_bitmode(BIT_16);
 	FSPI_CS(0);
-	status = fspi_trans(0x0500);
+	status = fspi_trans(cmd);
 	FSPI_CS(1);
 
-	return status;
+	return status&0xff;
 }
 
-int sf_wstat(int stat)
+int sf_wstat(int id, int stat)
 {
+	int cmd = (id)? 0x3100 : 0x0100;
+	cmd |= stat;
 
 	// status write enable
 	fspi_set_bitmode(BIT_8);
@@ -137,7 +140,7 @@ int sf_wstat(int stat)
 
 	fspi_set_bitmode(BIT_16);
 	FSPI_CS(0);
-	fspi_trans(0x0100|stat);
+	fspi_trans(cmd);
 	FSPI_CS(1);
 
 	return 0;
@@ -156,17 +159,18 @@ int sf_wen(int en)
 	return 0;
 }
 
-int sf_wait()
+int sf_wait(void)
 {
 	int status;
 
 	while(1){
-		status = sf_status();
+		status = sf_status(0);
 		if((status&1)==0)
 			break;
 	}
-	
-	return 0;
+
+	status |= sf_status(1)<<8;
+	return status;
 }
 
 
@@ -187,8 +191,8 @@ int sf_sector_erase(int cmd, int addr, int wait)
 
 int sf_erase(int addr, int size, int wait)
 {
-	while(size){
-		if((addr%0x8000)==0 && size<=0x8000){
+	while(size>0){
+		if((addr%0x8000)==0 && size>=0x8000){
 			sf_sector_erase(ERASE_32K, addr, wait);
 			addr += 0x8000;
 			size -= 0x8000;
@@ -198,7 +202,7 @@ int sf_erase(int addr, int size, int wait)
 			size -= 0x1000;
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -320,6 +324,15 @@ int selflash(int otp_boot)
 	fspi_init();
 	int id = sf_readid();
 	printk("Flash ID: %08x\n", id);
+	
+	//测试status
+	int stat0 = sf_status(0);
+	int stat1 = sf_status(1);
+	printk("    status: %02x %02x\n", stat0, stat1);
+	sf_wen(1);
+	stat0 = sf_status(0);
+	stat1 = sf_status(1);
+	printk("    status: %02x %02x\n", stat0, stat1);
 
 	int region_table = (int)&Region$$Table$$Base;
 	int firm_size = *(u32*)(region_table+0x10) - 0x07fc0000;
@@ -346,7 +359,7 @@ int selflash(int otp_boot)
 
 		// 读image header
 		sf_read(image_addr[0], 16, pbuf+0 );
-		sf_read(image_addr[0], 16, pbuf+16);
+		sf_read(image_addr[1], 16, pbuf+16);
 		printk("Product iamge0: %08x:  %08x %08x %08x\n", image_addr[0], __REV(p32[0]), p32[1], p32[2]);
 		printk("        iamge1: %08x:  %08x %08x %08x\n", image_addr[1], __REV(p32[4]), p32[5], p32[6]);
 
