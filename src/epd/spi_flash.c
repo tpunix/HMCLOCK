@@ -110,8 +110,11 @@ int sf_readid(void)
 	fspi_trans(0x90000000);
 	int id = fspi_trans(0);
 	FSPI_CS(1);
+	
+	id = __REV(id);
+	id &= 0xffff;
 
-	return __REV(id);
+	return id;
 }
 
 int sf_status(int id)
@@ -170,7 +173,7 @@ int sf_wait(void)
 	}
 
 	status |= sf_status(1)<<8;
-	return status;
+	return status&0x4000;
 }
 
 
@@ -323,22 +326,14 @@ int selflash(int otp_boot)
 
 	fspi_init();
 	int id = sf_readid();
-	printk("Flash ID: %08x\n", id);
-	
-	//测试status
-	int stat0 = sf_status(0);
-	int stat1 = sf_status(1);
-	printk("    status: %02x %02x\n", stat0, stat1);
-	sf_wen(1);
-	stat0 = sf_status(0);
-	stat1 = sf_status(1);
-	printk("    status: %02x %02x\n", stat0, stat1);
+	printk("Flash  ID: %08x\n", id);
 
 	int region_table = (int)&Region$$Table$$Base;
 	int firm_size = *(u32*)(region_table+0x10) - 0x07fc0000;
 	printk("Firm size: %08x\n", firm_size);
 	u32 firm_crc = crc32(0, (u8*)0x07fc0000, firm_size);
 	printk("Firm  crc: %08x\n", firm_crc);
+	printk("Firm  ver: %08x\n", EPD_VERSION);
 
 
 	memset(pbuf, 0, 256);
@@ -358,10 +353,10 @@ int selflash(int otp_boot)
 		image_addr[1] = p32[2];
 
 		// 读image header
-		sf_read(image_addr[0], 16, pbuf+0 );
-		sf_read(image_addr[1], 16, pbuf+16);
-		printk("Product iamge0: %08x:  %08x %08x %08x\n", image_addr[0], __REV(p32[0]), p32[1], p32[2]);
-		printk("        iamge1: %08x:  %08x %08x %08x\n", image_addr[1], __REV(p32[4]), p32[5], p32[6]);
+		sf_read(image_addr[0], 32, pbuf+0 );
+		sf_read(image_addr[1], 32, pbuf+32);
+		printk("Product iamge0: %08x:  %08x %08x %08x %08x\n", image_addr[0], __REV(p32[0]), p32[1], p32[2], p32[7]);
+		printk("        iamge1: %08x:  %08x %08x %08x %08x\n", image_addr[1], __REV(p32[8]), p32[9], p32[10],p32[15]);
 
 		// 获取当前使用的image的id
 		image_flag[0] = -1;
@@ -369,13 +364,13 @@ int selflash(int otp_boot)
 		if(pbuf[ 0]==0x70 && pbuf[ 1]==0x51 && pbuf[ 2]==0xaa){
 			image_flag[0] = (signed char)pbuf[ 3];
 		}
-		if(pbuf[16]==0x70 && pbuf[17]==0x51 && pbuf[18]==0xaa){
-			image_flag[1] = (signed char)pbuf[19];
+		if(pbuf[32]==0x70 && pbuf[33]==0x51 && pbuf[34]==0xaa){
+			image_flag[1] = (signed char)pbuf[35];
 		}
 		int active = (image_flag[0]>=image_flag[1]) ? 0 : 1;
 		printk("Active image: %d  flag: %02x\n", active, image_flag[active]);
 		
-		if(firm_crc != p32[active*4+2]){
+		if(EPD_VERSION != p32[active*8+7]){
 			// 当前运行的固件与flash中的固件不同
 			// 将当前固件写入非活动的image中
 			int new_flag = image_flag[active]+1;
@@ -389,13 +384,13 @@ int selflash(int otp_boot)
 			p32[0] = (new_flag<<24)|0x00aa5170;
 			p32[1] = firm_size;
 			p32[2] = firm_crc;
+			p32[7] = EPD_VERSION;
 			pbuf[0x20] = 0;
 
 			// 写入flash
 			u8 *firm_data = (u8*)0x07fc0000;
 			int addr = image_addr[new_id];
 			for(int i=0; i<firm_size+64; i+=256){
-				printk("Write %08x ...\n", addr);
 				if(i){
 					memcpy(pbuf, firm_data, 256);
 					firm_data += 256;
