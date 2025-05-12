@@ -228,7 +228,7 @@ void clock_draw(int full)
 {
 	char tbuf[64];
 
-	epd_init(104, 212, EPD_BWR|ROTATE_3);
+	epd_init();
 
 	memset(fb_bw, 0xff, scr_h*line_bytes);
 	memset(fb_rr, 0x00, scr_h*line_bytes);

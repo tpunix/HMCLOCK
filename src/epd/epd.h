@@ -28,11 +28,12 @@ int sf_read(int addr, int len, u8 *buf);
 int selflash(int otp_boot);
 
 // epd_hw
-void epd_hw_init(u32 config0, u32 config1);
+void epd_hw_init(u32 config0, u32 config1, int w, int h, int mode);
 void epd_hw_open(void);
 void epd_hw_close(void);
 void epd_reset(void);
 void epd_wait(void);
+int  epd_busy(void);
 void epd_power(int on);
 
 void epd_cmd(int cmd);
@@ -46,8 +47,7 @@ void epd_read(u8 *data, int len);
 void epd_cmd_read(int cmd, u8 *data, int len);
 
 // epd_xxx
-
-void epd_init(int x, int y, int mode);
+void epd_init(void);
 void epd_load_lut(u8 *lut);
 void epd_update(int mode);
 void epd_sleep(void);

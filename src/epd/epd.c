@@ -5,7 +5,7 @@
 
 /******************************************************************************/
 
-// Ó²¼þ²ÎÊý
+// ç¡¬ä»¶å‚æ•°
 int scr_w;
 int scr_h;
 int scr_mode;
@@ -13,12 +13,12 @@ int line_bytes;
 int scr_padding;
 
 
-// ´°¿Ú²ÎÊý
+// çª—å£å‚æ•°
 int win_w;
 int win_h;
 
 
-// x±ØÐëÊÇ8µÄ±¶Êý£¬ÇÒx2>x1, Y2>y1
+// xå¿…é¡»æ˜¯8çš„å€æ•°ï¼Œä¸”x2>x1, Y2>y1
 void epd_window(int x1, int y1, int x2, int y2)
 {
 	int tmp;
@@ -218,16 +218,11 @@ int epd_lut_size(void)
 	return i;
 }
 
-void epd_init(int w, int h, int mode)
+void epd_init(void)
 {
 	epd_hw_open();
 
-	scr_w = w;
-	scr_h = h;
-	scr_mode = mode;
-	line_bytes = (scr_w+7)>>3;
-	scr_padding = line_bytes*8-scr_w;
-	printk("epd_init: scr: %d x %d\n", scr_w, scr_h);
+	printk("epd_init: %dx%d\n", scr_w, scr_h);
 
 	epd_power(1);
 	epd_reset();

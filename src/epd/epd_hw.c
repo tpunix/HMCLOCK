@@ -71,7 +71,7 @@ void delay_ms(int ms)
 /******************************************************************************/
 
 
-void epd_hw_init(u32 config0, u32 config1)
+void epd_hw_init(u32 config0, u32 config1, int w, int h, int mode)
 {
 	epio_pwr  = (config0>>24)&0xff;
 	epio_busy = (config0>>16)&0xff;
@@ -80,6 +80,12 @@ void epd_hw_init(u32 config0, u32 config1)
 	epio_cs   = (config1>>16)&0xff;
 	epio_clk  = (config1>> 8)&0xff;
 	epio_sdi  = (config1>> 0)&0xff;
+	
+	scr_w = w;
+	scr_h = h;
+	scr_mode = mode;
+	line_bytes = (scr_w+7)>>3;
+	scr_padding = line_bytes*8-scr_w;
 }
 
 void epd_hw_open(void)
@@ -144,6 +150,12 @@ void epd_reset(void)
 void epd_wait(void)
 {
 	while(EPD_BUSY());
+}
+
+
+int epd_busy(void)
+{
+	return EPD_BUSY();
 }
 
 
