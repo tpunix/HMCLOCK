@@ -11,6 +11,7 @@ int scr_h;
 int scr_mode;
 int line_bytes;
 int scr_padding;
+int update_mode;
 
 
 // 窗口参数
@@ -89,7 +90,7 @@ void epd_pos(int x, int y)
 	epd_data(y>>8);
 }
 
-u8 lut[80] = {
+u8 lut_fast[80] = {
 //  RP0   RP1   RP2   RP3   RP4   RP5   RP6
     0x80, 0x60, 0x40, 0x00, 0x00, 0x00, 0x00,  // LUT0
     0x10, 0x60, 0x20, 0x00, 0x00, 0x00, 0x00,  // LUT1
@@ -110,16 +111,19 @@ u8 lut[80] = {
     0x15, 0x41, 0xa8, 0x32, 0x30, 0x0a,
 };
 
-u8 lut_p[80] = {
+
+// 这里如果B-B和W->W不驱动的话，屏幕很快就会花掉。
+// 但如果驱动的话，这种黑白转换就没有意义了。
+u8 lut_fly[80] = {
 //  RP0   RP1   RP2   RP3   RP4   RP5   RP6
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT0
-    0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT1
-    0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT2
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT3
+    0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT0  B->B
+    0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT1  B->W
+    0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT2  W->B
+    0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT3  W->W
 
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // LUT4
 
-    0x0a, 0x00, 0x00, 0x00, 0x01,  // Group0
+    0x0f, 0x00, 0x00, 0x00, 0x01,  // Group0
     0x00, 0x00, 0x00, 0x00, 0x01,  // Group1
     0x00, 0x00, 0x00, 0x00, 0x01,  // Group2
     0x00, 0x00, 0x00, 0x00, 0x01,  // Group3
@@ -224,15 +228,18 @@ void epd_init(void)
 
 	printk("epd_init: %dx%d\n", scr_w, scr_h);
 
+	update_mode = UPDATE_FULL;
 	epd_power(1);
-	epd_reset();
+	epd_reset(1);
 
+#if 0
 	epd_wait();
 	epd_cmd(0x12);  // SWRESET
 	delay_ms(10);
 	epd_wait();
 
-	//epd_lut_size();
+//	epd_lut_size();
+#endif
 
 	epd_cmd1(0x74, 0x54);
 	epd_cmd1(0x7e, 0x3b);
@@ -245,50 +252,47 @@ void epd_init(void)
 	epd_cmd1(0x3c, 0x05);  // border wavefrom
 
 	epd_window(0, 0, scr_w-1, scr_h-1);
-	
+
 	epd_cmd1(0x18, 0x80);  // Read Built-in temperature sensor
+
 #if 0
-
-	epd_cmd1(0x18, 0x80);  // Read Built-in temperature sensor
-
 	epd_cmd1(0x22, 0xb1);
 	epd_cmd(0x20);
 	epd_wait();
 	epd_dump_lut();
-
 #endif
 }
 
 
-void epd_update(int mode)
+void epd_update_mode(int mode)
+{
+	update_mode = mode;
+}
+
+
+void epd_update(void)
 {
 	int seq;
 
-	if(mode==0){
+	if(update_mode==UPDATE_FULL){
 		seq = 0xf7;
 	}else{
-		seq = mode;
+		if(update_mode==UPDATE_FAST){
+			epd_load_lut(lut_fast);
+		}else{
+			epd_load_lut(lut_fly);
+		}
+		seq = 0xc7;
 	}
 
 	epd_cmd1(0x22, seq);
 	epd_cmd(0x20);
-	epd_wait();
-//	epd_dump_lut();
-}
-
-void epd_update_lut(u8 *lut)
-{
-	epd_load_lut(lut);
-	epd_cmd1(0x22, 0xc4);
-	epd_cmd(0x20);
-	epd_wait();
 }
 
 
 void epd_sleep(void)
 {
 	epd_cmd1(0x10, 01);
-	delay_ms(10);
 }
 
 
@@ -305,11 +309,8 @@ void epd_screen_update(void)
 	if(scr_mode&EPD_BWR){
 		epd_cmd(0x26);
 		for(i=0; i<win_h*line_bytes; i++){
-			//epd_data(fb_rr[i]);
-			epd_data(fb_bw[i]^0xff);
-			//epd_data(0xff);
+			epd_data(fb_rr[i]);
 		}
-		//memcpy(fb_rr, fb_bw, win_h*line_bytes);
 	}
 }
 
@@ -362,66 +363,39 @@ void epd_screen_clean(int mode)
 
 void epd_test(void)
 {
-//	epd_hw_init(0x23200700, 0x05210006);  // for 2.13 board BW
+	epd_hw_init(0x23200700, 0x05210006, 104, 212,         ROTATE_3);  // for 2.13 board BW
+//	epd_hw_init(0x23111000, 0x07210120, 122, 250, EPD_BWR|ROTATE_3);  // for 2.13 board BWR
+//	epd_hw_init(0x23200700, 0x05210006, 128, 296, EPD_BWR|ROTATE_3);  // for 2.90 board
 
-//	epd_hw_init(0x23111000, 0x07210120);  // for 2.13 board BWR
-//	epd_init(104, 212,         ROTATE_3);
-	epd_init(104, 212, EPD_BWR|ROTATE_3);
-
-//	epd_hw_init(0x23111000, 0x07210120);  // for 2.13 board BWR
-//	epd_init(122, 250, EPD_BWR|ROTATE_3);
-
-//	epd_hw_init(0x23200700, 0x05210006);  // for 2.90 board
-//	epd_init(128, 296, EPD_BWR|ROTATE_3);
+	epd_init();
 
 #if 0
 	epd_screen_clean(2);
 #else
 	fb_test();
 #endif
-	//epd_load_lut(lut);
-	//epd_cmd1(0x2c, 0x08);
-	//epd_update(0xc7);
-	epd_update(0xf4);
+	epd_update();
+	epd_wait();
 
-#if 0
-	epd_window(32, 16, 96, 80);
-	epd_screen_clean(1);
-	epd_update_lut(lut);
-	//epd_update(0);
-#endif
 
-#if 0
-	epd_load_lut(lut_p);
-	epd_cmd1(0x2c, 0x55);
-
-#if 0
-	epd_cmd(0x37);
-	epd_data(0x00);
-	epd_data(0x00);
-	epd_data(0x00);
-	epd_data(0x00);
-	epd_data(0x40);
-	epd_data(0x00);
-	epd_data(0x00);
-#endif
-
-	epd_update(0xc0);
+#if 1
+	epd_update_mode(UPDATE_FLY);
+//	epd_cmd1(0x2c, 0x55);
+//	epd_update(0xc0);
 
 	for(int i=0; i<10; i++)
 	{
+		printk("%d\n", i);
 		delay_ms(3000);
 		fb_test();
-		epd_update(0x04);
-		//epd_update(0xf7);
-		//scr_mode += 1;
-		//scr_mode &= 0xf3;
+		epd_update();
+		epd_wait();
 	}
 #endif
 
-	delay_ms(1000);
+	delay_ms(5000);
 	printk("\nepd_test done.\n");
-	epd_cmd1(0x10, 0x03);
+	epd_cmd1(0x10, 0x01);
 	epd_power(0);
 	epd_hw_close();
 	//epd_update(0x03);

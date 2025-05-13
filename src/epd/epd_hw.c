@@ -80,7 +80,7 @@ void epd_hw_init(u32 config0, u32 config1, int w, int h, int mode)
 	epio_cs   = (config1>>16)&0xff;
 	epio_clk  = (config1>> 8)&0xff;
 	epio_sdi  = (config1>> 0)&0xff;
-	
+
 	scr_w = w;
 	scr_h = h;
 	scr_mode = mode;
@@ -138,12 +138,9 @@ static int epd_spi_read(void)
 }
 
 
-void epd_reset(void)
+void epd_reset(int val)
 {
-	EPD_RST(0);
-	delay_ms(20);
-	EPD_RST(1);
-	delay_ms(20);
+	EPD_RST(val);
 }
 
 

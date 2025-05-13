@@ -31,7 +31,7 @@ int selflash(int otp_boot);
 void epd_hw_init(u32 config0, u32 config1, int w, int h, int mode);
 void epd_hw_open(void);
 void epd_hw_close(void);
-void epd_reset(void);
+void epd_reset(int val);
 void epd_wait(void);
 int  epd_busy(void);
 void epd_power(int on);
@@ -48,8 +48,8 @@ void epd_cmd_read(int cmd, u8 *data, int len);
 
 // epd_xxx
 void epd_init(void);
-void epd_load_lut(u8 *lut);
-void epd_update(int mode);
+void epd_update_mode(int mode);
+void epd_update();
 void epd_sleep(void);
 void epd_window(int x1, int y1, int x2, int y2);
 void epd_screen_update(void);
@@ -84,11 +84,17 @@ void fb_test(void);
 #define RED       2
 
 
+#define UPDATE_FULL  0
+#define UPDATE_FAST  1
+#define UPDATE_FLY   2
+
+
 extern int scr_w;
 extern int scr_h;
 extern int scr_mode;
 extern int line_bytes;
 extern int scr_padding;
+extern int update_mode;
 
 extern int win_w;
 extern int win_h;

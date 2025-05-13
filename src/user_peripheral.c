@@ -183,7 +183,7 @@ void user_app_init(void)
 
 	adv_count = 0;
 	fspi_config(0x00030605);
-	epd_hw_init(0x23200700, 0x05210006, 104, 212, EPD_BWR|ROTATE_3);  // for 2.13 board BW
+	epd_hw_init(0x23200700, 0x05210006, 104, 212, ROTATE_3);  // for 2.13 board BW
 
 	selflash(otp_boot);
 

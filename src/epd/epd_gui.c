@@ -43,16 +43,11 @@ void draw_pixel(int x, int y, int color)
 	int byte_pos = ny*line_bytes+(nx>>3);
 	int bit_mask = 0x80>>(nx&7);
 
-	if(color==RED){
+	if(color!=WHITE){
+		fb_bw[byte_pos] &= ~bit_mask;
+	}
+	if(scr_mode&EPD_BWR && color==RED){
 		fb_rr[byte_pos] |=  bit_mask;
-		fb_bw[byte_pos] |=  bit_mask;
-	}else{
-		fb_rr[byte_pos] &= ~bit_mask;
-		if(color==WHITE){
-			fb_bw[byte_pos] |=  bit_mask;
-		}else{
-			fb_bw[byte_pos] &= ~bit_mask;
-		}
 	}
 }
 
@@ -224,11 +219,14 @@ char *wday_str[] = {
 	"日",
 };
 
+
 static int wday = 0;
 void fb_test(void)
 {
 	memset(fb_bw, 0xff, scr_h*line_bytes);
-	memset(fb_rr, 0x00, scr_h*line_bytes);
+	if(scr_mode&EPD_BWR){
+		memset(fb_rr, 0x00, scr_h*line_bytes);
+	}
 
 	draw_rect(0, 0, fb_w-1, fb_h-1, BLACK);
 	draw_rect(1, 1, fb_w-2, fb_h-2, BLACK);
@@ -246,9 +244,7 @@ void fb_test(void)
 	select_font(0);
 
 	char tbuf[64];
-//	sprintf(tbuf, "%4d年%2d月%2d日 星期%s", 2025, 4, 29, wday_str[wday]);
-	sprintf(tbuf, "2025年 4月29日 星期%s", wday_str[wday]);
-	printk("tbuf: %s\n", tbuf);
+	sprintk(tbuf, "%4d年%2d月%2d日 星期%s", 2025, 4, 29, wday_str[wday]);
 	draw_text(15, 85, tbuf, BLACK);
 	
 	wday += 1;
@@ -256,7 +252,8 @@ void fb_test(void)
 		wday = 0;
 
 	select_font(1);
-	draw_text(12, 20, "02:34", BLACK);
+	sprintk(tbuf, "%02d:%02d", 2+wday, 30+wday);
+	draw_text(12, 20, tbuf, BLACK);
 
 	epd_screen_update();
 }

@@ -247,14 +247,14 @@ void clock_draw(int full)
 	epd_screen_update();
 	
 	if(full){
-		epd_update(0xf4);
+		epd_update_mode(UPDATE_FULL);
 	}else{
-		epd_load_lut(lut_p);
-		epd_cmd1(0x2c, 0x55);
-		epd_update(0xc0);
-		epd_update(0x04);
+		epd_update_mode(UPDATE_FLY);
 	}
-	epd_cmd1(0x10, 0x03);
+	epd_update();
+	epd_wait();
+
+	epd_cmd1(0x10, 0x01);
 	epd_power(0);
 	epd_hw_close();
 }
