@@ -110,6 +110,12 @@ void date_inc(void)
 	}
 }
 
+// 0: 状态不变
+// 1: 分钟改变
+// 2: 分钟改变10分钟
+// 3: 小时改变
+// 4: 天数改变
+
 int clock_update(int inc)
 {
 	int retv = 0;
@@ -178,6 +184,11 @@ void clock_print(void)
 
 /****************************************************************************************/
 
+static char *wday_str[] = {"一", "二", "三", "四", "五", "六", "日"};
+static int epd_wait_state;
+static timer_hnd epd_wait_hnd;
+
+
 static uint8_t batt_cal(uint16_t adc_sample)
 {
     uint8_t batt_lvl;
@@ -196,15 +207,15 @@ static uint8_t batt_cal(uint16_t adc_sample)
     return batt_lvl;
 }
 
-static void draw_batt(void)
+static void draw_batt(int x, int y)
 {
 	int p = batt_cal(adcval);
 	p /= 10;
 
-	draw_rect(190, 8, 202, 14, BLACK);
-	draw_box(188, 10, 189, 12, BLACK);
+	draw_rect(x, y-4, x+14, y+4, BLACK);
+	draw_box(x-2, y-1, x-1, y+1, BLACK);
 
-	draw_box(201-p, 9, 201, 13, BLACK);
+	draw_box(x+12-p, y-2, x+12, y+2, BLACK);
 }
 
 static void draw_bt(int x, int y)
@@ -222,41 +233,52 @@ static void draw_bt(int x, int y)
 }
 
 
-char *wday_str[] = {"一", "二", "三", "四", "五", "六", "日"};
+static void epd_wait_timer(void)
+{
+	if(epd_busy()){
+		epd_wait_hnd = app_easy_timer(40, epd_wait_timer);
+	}else{
+		epd_wait_hnd = EASY_TIMER_INVALID_TIMER;
+		epd_cmd1(0x10, 0x01);
+		epd_power(0);
+		epd_hw_close();
+		arch_set_sleep_mode(ARCH_EXT_SLEEP_ON);
+	}
+}
 
-void clock_draw(int full)
+
+void clock_draw(int flags)
 {
 	char tbuf[64];
 
-	epd_init();
+	epd_hw_open();
+
+	epd_update_mode(flags&3);
 
 	memset(fb_bw, 0xff, scr_h*line_bytes);
 	memset(fb_rr, 0x00, scr_h*line_bytes);
 
-	draw_batt();
-	draw_bt(180, 11);
+	draw_batt(190, 13);
+	if(flags&DRAW_BT){
+		draw_bt(180, 13);
+	}
 	
 	select_font(1);
 	sprintf(tbuf, "%02d:%02d", hour, minute);
-	draw_text(12, 20, tbuf, BLACK);
+	draw_text(12, 25, tbuf, BLACK);
 
-	sprintf(tbuf, "%4d年%2d月%2d日 星期%s", year, month+1, date+1, wday_str[wday]);
+	sprintf(tbuf, "%4d年%2d月%2d日   星期%s", year, month+1, date+1, wday_str[wday]);
 	select_font(0);
-	draw_text(15, 85, tbuf, BLACK);
-
-	epd_screen_update();
+	draw_text(15, 8, tbuf, BLACK);
 	
-	if(full){
-		epd_update_mode(UPDATE_FULL);
-	}else{
-		epd_update_mode(UPDATE_FLY);
-	}
-	epd_update();
-	epd_wait();
+	draw_text(12, 85, "十二月初二", BLACK);
 
-	epd_cmd1(0x10, 0x01);
-	epd_power(0);
-	epd_hw_close();
+	epd_init();
+	epd_screen_update();
+	epd_update();
+
+	arch_set_sleep_mode(ARCH_SLEEP_OFF);
+	epd_wait_hnd = app_easy_timer(40, epd_wait_timer);
 }
 
 
@@ -274,7 +296,7 @@ void user_svc1_long_val_wr_ind_handler(ke_msg_id_t const msgid, struct custs1_va
 	printk("Long value: %d\n", param->length);
 	if(param->value[0]==0x91){
 		clock_set((uint8_t*)param->value);
-//		clock_draw(1);
+		clock_draw(DRAW_BT|UPDATE_FAST);
 		clock_print();
 	}
 }

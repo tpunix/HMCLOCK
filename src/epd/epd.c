@@ -224,11 +224,8 @@ int epd_lut_size(void)
 
 void epd_init(void)
 {
-	epd_hw_open();
+	//printk("epd_init: %dx%d\n", scr_w, scr_h);
 
-	printk("epd_init: %dx%d\n", scr_w, scr_h);
-
-	update_mode = UPDATE_FULL;
 	epd_power(1);
 	epd_reset(1);
 

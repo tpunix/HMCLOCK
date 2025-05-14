@@ -88,6 +88,7 @@ void fb_test(void);
 #define UPDATE_FAST  1
 #define UPDATE_FLY   2
 
+#define DRAW_BT   0x80
 
 extern int scr_w;
 extern int scr_h;

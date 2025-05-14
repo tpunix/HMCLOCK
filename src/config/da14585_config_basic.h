@@ -77,6 +77,7 @@
 /*          It allows developer to hot attach debugger and get debug information                                */
 /****************************************************************************************************************/
 #define CFG_DEVELOPMENT_DEBUG
+#undef  CFG_DEVELOPMENT_DEBUG
 
 /****************************************************************************************************************/
 /* UART Console Print. If CFG_PRINTF is defined, serial interface logging mechanism will be enabled.            */

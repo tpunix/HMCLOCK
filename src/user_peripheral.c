@@ -60,14 +60,6 @@
  ****************************************************************************************
  */
 
-// Manufacturer Specific Data ADV structure type
-struct mnf_specific_data_ad_structure
-{
-    uint8_t ad_structure_size;
-    uint8_t ad_structure_type;
-    uint8_t company_id[APP_AD_MSD_COMPANY_ID_LEN];
-    uint8_t proprietary_data[APP_AD_MSD_DATA_LEN];
-};
 
 /*
  * GLOBAL VARIABLE DEFINITIONS
@@ -77,6 +69,13 @@ struct mnf_specific_data_ad_structure
 uint8_t app_connection_idx                      __SECTION_ZERO("retention_mem_area0");
 timer_hnd app_clock_timer_used                  __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
 timer_hnd app_param_update_request_timer_used   __SECTION_ZERO("retention_mem_area0");
+
+static int adv_state;
+static int otp_btaddr[2];
+static int otp_boot;
+static char adv_name[20];
+int clock_interval;
+
 
 /*
  * FUNCTION DEFINITIONS
@@ -135,10 +134,6 @@ static void param_update_request_timer_cb()
     app_param_update_request_timer_used = EASY_TIMER_INVALID_TIMER;
 }
 
-static int adv_count;
-int otp_btaddr[2];
-int otp_boot;
-char adv_name[20];
 
 static void read_otp_value(void)
 {
@@ -181,7 +176,8 @@ void user_app_init(void)
     app_param_update_request_timer_used = EASY_TIMER_INVALID_TIMER;
 	app_clock_timer_used = EASY_TIMER_INVALID_TIMER;
 
-	adv_count = 0;
+	clock_interval = 60; // 60s
+	adv_state = 0;
 	fspi_config(0x00030605);
 	epd_hw_init(0x23200700, 0x05210006, 104, 212, ROTATE_3);  // for 2.13 board BW
 
@@ -190,44 +186,38 @@ void user_app_init(void)
     default_app_on_init();
 }
 
-void user_app_before_sleep(void)
-{
-	epd_hw_close();
-}
-
-
-void epd_test(void);
-void epd_test2(void);
-
 
 static void app_clock_timer_cb(void)
 {
-	app_clock_timer_used = app_easy_timer(1000, app_clock_timer_cb);
+	app_clock_timer_used = app_easy_timer(clock_interval*100, app_clock_timer_cb);
 
-	int stat = clock_update(10);
+	int stat = clock_update(clock_interval);
 	clock_print();
 
-	if(stat>0){
-		int full = (stat>1)? 1:0;
-		clock_draw(full);
+	int flags = UPDATE_FLY;
+	if(stat>=3){
+		flags = DRAW_BT | UPDATE_FULL;
+	}else if(stat>=2){
+		flags = DRAW_BT | UPDATE_FAST;
 	}
 
-	if(adv_count<20){
-		if(adv_count>=12){
-			adv_count = 0;
-			user_app_adv_start();
-		}else{
-			adv_count += 1;
-		}
+	if(flags==4){
+		adc1_update();
 	}
 
+	if(flags&DRAW_BT){
+		user_app_adv_start();
+	}
+
+	if(stat>0 || flags&DRAW_BT){
+		clock_draw(flags);
+	}
 }
 
 
 void user_app_on_db_init_complete( void )
 {
-	app_clock_timer_used = app_easy_timer(1000, app_clock_timer_cb);
-	printk("\nuser_app_on_db_init_complete! %08x\n", app_clock_timer_used);
+	printk("\nuser_app_on_db_init_complete!\n");
 
 	int adcval = adc1_update();
 	printk("Voltage: %d\n", adcval);
@@ -235,13 +225,19 @@ void user_app_on_db_init_complete( void )
 	clock_print();
 	clock_push();
 
-	clock_draw(1);
-
+	clock_draw(DRAW_BT|UPDATE_FULL);
 	user_app_adv_start();
+
+	app_clock_timer_used = app_easy_timer(clock_interval*100, app_clock_timer_cb);
 }
+
 
 void user_app_adv_start(void)
 {
+	if(adv_state)
+		return;
+	adv_state = 1;
+
     struct gapm_start_advertise_cmd* cmd = app_easy_gap_undirected_advertise_get_active();
 	app_add_ad_struct(cmd, adv_name, adv_name[0]+1, 1);
 
@@ -258,7 +254,6 @@ void user_app_connection(uint8_t connection_idx, struct gapc_connection_req_ind 
 
     if (app_env[connection_idx].conidx != GAP_INVALID_CONIDX)
     {
-		adv_count = 20;
         app_connection_idx = connection_idx;
 
 		printk("  interval: %d\n", param->con_interval);
@@ -277,9 +272,7 @@ void user_app_connection(uint8_t connection_idx, struct gapc_connection_req_ind 
 		
 		clock_push();
     } else {
-        // No connection has been established, restart advertising
-        //user_app_adv_start();
-		adv_count = 0;
+		adv_state = 0;
     }
 
     default_app_on_connection(connection_idx, param);
@@ -288,6 +281,10 @@ void user_app_connection(uint8_t connection_idx, struct gapc_connection_req_ind 
 void user_app_adv_undirect_complete(uint8_t status)
 {
 	printk("user_app_adv_undirect_complete: %02x\n", status);
+	if(status!=0){
+		adv_state = 0;
+		clock_draw(UPDATE_FLY);
+	}
 }
 
 
@@ -302,12 +299,15 @@ void user_app_disconnect(struct gapc_disconnect_ind const *param)
         app_param_update_request_timer_used = EASY_TIMER_INVALID_TIMER;
     }
 
+	adv_state = 0;
+
 	if(param->reason!=CO_ERROR_REMOTE_USER_TERM_CON){
 		// 非主动断开连接时, 重新广播.
 		user_app_adv_start();
+	}else{
+		clock_draw(UPDATE_FLY);
 	}
 
-	adv_count = 0;
 }
 
 
