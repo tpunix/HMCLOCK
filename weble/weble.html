@@ -7,6 +7,8 @@
 </head>
 <body>
 	<button id="connect-button">连接</button>
+	<button id="setime-button" disabled>对时</button>
+	<button id="upfirm-button" disabled>升级</button>
 	<div id="device_name"></div>
 	<div id="current_voltage"></div>
 	<div id="current_time"></div>
@@ -17,6 +19,7 @@
 	<script>
 		var connected = false;
 		var device = null;
+		var longValue = null;
 
 		function formatTime(year, month, mday, hour, min, sec) {
 			month += 1;
@@ -55,7 +58,7 @@
 
 				var ctrlPoint = await service.getCharacteristic( 0xff03 );
 				var adc1Value = await service.getCharacteristic( 0xff02 );
-				var longValue = await service.getCharacteristic( 0xff01 );
+				longValue = await service.getCharacteristic( 0xff01 );
 
 				cur_voltage = await adc1Value.readValue();
 				console.log('cur_voltage:', cur_voltage);
@@ -69,7 +72,6 @@
 				hour   = cur_time.getUint8(4);
 				minute = cur_time.getUint8(5);
 				second = cur_time.getUint8(6);
-
 				document.getElementById('current_time').textContent = "当前时间: "+formatTime(year, month, mday, hour, minute, second);
 
 				var buf = new Uint8Array(10);
@@ -81,32 +83,64 @@
 				hour = today.getHours();
 				minute = today.getMinutes();
 				second = today.getSeconds();
-				console.log('today:',today, 'wday:', wday);
-				buf[0] = 0x91;
-				buf[1] = year%256;
-				buf[2] = year/256;
-				buf[3] = month;
-				buf[4] = mday;
-				buf[5] = hour;
-				buf[6] = minute;
-				buf[7] = second;
-				buf[8] = wday;
-				buf[9] = 0;
-				await longValue.writeValue(buf);
-
 				document.getElementById('system_time').textContent = "系统时间: "+formatTime(year, month, mday, hour, minute, second);
 
 				connected = true;
+				document.getElementById('setime-button').disabled = false;
 				document.getElementById('connect-button').textContent = "断开";
-
-				console.log('同步时间成功!');
 			} catch (error) {
 				console.log('连接失败:', error);
 				disconnect();
 			}
 		}
 
+		async function onSetTime() {
+			document.getElementById('setime-button').disabled = true;
+
+			var today = new Date();
+			year = today.getFullYear();
+			month = today.getMonth();
+			mday = today.getDate();
+			wday = today.getDay();
+			hour = today.getHours();
+			minute = today.getMinutes();
+			second = today.getSeconds();
+
+			locale_str = today.toLocaleDateString('zh-CN-u-ca-chinese',{month:'numeric',day:'numeric'});
+			l_month = 0;
+			if(locale_str.charAt(0)=='闰'){
+				l_month = 128;
+				locale_str = locale_str.substr(1,);
+			}
+			lstr_split = locale_str.split('-');
+			l_month += parseInt(lstr_split[0]);
+			l_mday   = parseInt(lstr_split[1]);
+			locale_year = today.toLocaleDateString('zh-CN-u-ca-chinese',{year:'numeric'});
+			l_year = parseInt(locale_year.substr(0,4));
+			console.log('年:', l_year, '月:', l_month, '日:', l_mday);
+
+			var buf = new Uint8Array(12);
+			buf[0] = 0x91;
+			buf[1] = year%256;
+			buf[2] = year/256;
+			buf[3] = month;
+			buf[4] = mday;
+			buf[5] = hour;
+			buf[6] = minute;
+			buf[7] = second;
+			buf[8] = wday;
+			buf[9] = l_year-2020;
+			buf[10]= l_month-1;
+			buf[11]= l_mday;
+			await longValue.writeValue(buf);
+
+			document.getElementById('system_time').textContent = "系统时间: "+formatTime(year, month, mday, hour, minute, second);
+			console.log('同步时间成功!');
+			document.getElementById('setime-button').disabled = false;
+		}
+
 		function disconnect() {
+			document.getElementById('setime-button').disabled = true;
 			if(!device)
 				return;
 			if(device.gatt.connected){
@@ -119,10 +153,12 @@
 			device = null;
 			console.log('设备已断开连接');
 			connected = false;
+			document.getElementById('setime-button').disabled = true;
 			document.getElementById('connect-button').textContent = "连接";
 		}
 
 		document.getElementById('connect-button').addEventListener('click', onClick);
+		document.getElementById('setime-button').addEventListener('click', onSetTime);
 	</script>
 </body>
 </html>
