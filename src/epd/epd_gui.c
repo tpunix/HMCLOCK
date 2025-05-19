@@ -142,6 +142,7 @@ int fb_draw_font(int x, int y, int ucs, int color)
 	u8 *font_data = find_font(current_font, ucs);
 	if(font_data==NULL){
 		printk("fb_draw %04x: not found!\n");
+		font_data = find_font(current_font, '?');
 	}
 
 	int ft_adv = font_data[0];
