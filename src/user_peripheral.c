@@ -74,6 +74,7 @@ static int adv_state;
 static int otp_btaddr[2];
 static int otp_boot;
 static char adv_name[20];
+char *bt_id = adv_name+12;
 int clock_interval;
 
 
