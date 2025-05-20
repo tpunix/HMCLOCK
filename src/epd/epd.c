@@ -356,6 +356,26 @@ void epd_screen_clean(int mode)
 
 /******************************************************************************/
 
+
+int epd_detect(void)
+{
+	int retv = 0;
+
+	epd_hw_open();
+	epd_reset(1);
+	epd_cmd(0x12); // SWRESET
+	if(epd_busy()){
+		epd_wait();
+		retv = 1;
+	}
+	epd_hw_close();
+	return retv;
+}
+
+
+/******************************************************************************/
+
+
 #if 0
 
 void epd_test(void)

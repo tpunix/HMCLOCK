@@ -180,7 +180,11 @@ void user_app_init(void)
 	clock_interval = 60; // 60s
 	adv_state = 0;
 	fspi_config(0x00030605);
-	epd_hw_init(0x23200700, 0x05210006, 104, 212, ROTATE_3);  // for 2.13 board BW
+
+	epd_hw_init(0x23200700, 0x05210006, 104, 212, ROTATE_3);  // 2.13黑白屏，6个测试点
+	if(epd_detect()==0){
+		epd_hw_init(0x23111000, 0x07210120, 104, 212, ROTATE_3);  // 2.13黑白屏，5个测试点
+	}
 
 	selflash(otp_boot);
 
