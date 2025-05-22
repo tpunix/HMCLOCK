@@ -184,6 +184,7 @@ void user_app_init(void)
 	epd_hw_init(0x23200700, 0x05210006, 104, 212, ROTATE_3);  // 2.13黑白屏，6个测试点
 	if(epd_detect()==0){
 		epd_hw_init(0x23111000, 0x07210120, 104, 212, ROTATE_3);  // 2.13黑白屏，5个测试点
+		epd_detect();
 	}
 
 	selflash(otp_boot);
