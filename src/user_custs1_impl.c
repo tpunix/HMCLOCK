@@ -111,7 +111,7 @@ static int jieqi_info[] =
 #define xiaohan_2020  451804
 
 
-int year=2025, month=0, date=0, wday=2;
+int year=2025, month=0, date=0, wday=3;
 int l_year=4, l_month=11, l_date=1;
 int hour=0, minute=0, second=0;
 
@@ -276,7 +276,7 @@ void clock_set(uint8_t *buf)
 	hour   = buf[5];
 	minute = buf[6];
 	second = buf[7];
-	wday   = buf[8]-1;
+	wday   = buf[8];
 	l_year = buf[9];
 	l_month= buf[10];
 	l_date = buf[11]-1;
@@ -319,7 +319,7 @@ static char *jieqi_name[] = {
 	"小暑", "大暑", "立秋", "处暑", "白露", "秋分",
 	"寒露", "霜降", "立冬", "小雪", "大雪", "冬至",
 };
-static char *wday_str[] = {"一", "二", "三", "四", "五", "六", "日"};
+static char *wday_str[] = {"日", "一", "二", "三", "四", "五", "六"};
 static char *lday_str_lo[] = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "冬", "腊", "正"};
 static char *lday_str_hi[] = {"初", "十", "廿", "二", "三"};
 
