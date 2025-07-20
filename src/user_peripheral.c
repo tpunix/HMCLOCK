@@ -77,6 +77,8 @@ static char adv_name[20];
 char *bt_id = adv_name+12;
 int clock_interval;
 
+const volatile u32 epd_version[3] = {0xF9A51379, ~0xF9A51379, EPD_VERSION};
+
 
 /*
  * FUNCTION DEFINITIONS
@@ -173,7 +175,7 @@ void user_app_init(void)
 {
 	read_otp_value();
 
-	printk("\n\nuser_app_init! %s\n", __TIME__);
+	printk("\n\nuser_app_init! %s %08x\n", __TIME__, epd_version[2]);
     app_param_update_request_timer_used = EASY_TIMER_INVALID_TIMER;
 	app_clock_timer_used = EASY_TIMER_INVALID_TIMER;
 
@@ -240,12 +242,21 @@ void user_app_on_db_init_complete( void )
 
 void user_app_adv_start(void)
 {
+	u8 vbuf[4];
+
 	if(adv_state)
 		return;
 	adv_state = 1;
 
     struct gapm_start_advertise_cmd* cmd = app_easy_gap_undirected_advertise_get_active();
 	app_add_ad_struct(cmd, adv_name, adv_name[0]+1, 1);
+
+	vbuf[0] = 0x03;
+	vbuf[1] = GAP_AD_TYPE_MANU_SPECIFIC_DATA;
+	vbuf[2] = EPD_VERSION&0xff;
+	vbuf[3] = (EPD_VERSION>>8)&0xff;
+	app_add_ad_struct(cmd, vbuf, vbuf[0]+1, 1);
+
 
 	//default_advertise_operation();
     //app_easy_gap_undirected_advertise_start();
@@ -327,7 +338,7 @@ void user_catch_rest_hndl(ke_msg_id_t const msgid,
         case CUSTS1_VAL_WRITE_IND:
         {
 			/* 写特征值通知. 值已经写入Database中了. */
-			printk("CUSTS1_VAL_WRITE_IND!\n");
+			//printk("CUSTS1_VAL_WRITE_IND!\n");
             struct custs1_val_write_ind const *msg_param = (struct custs1_val_write_ind const *)(param);
 
             switch (msg_param->handle)
@@ -358,7 +369,7 @@ void user_catch_rest_hndl(ke_msg_id_t const msgid,
         case CUSTS1_ATT_INFO_REQ:
         {
 			/* 读ATT_INFO请求. 需要返回数据. */
-			printk("CUSTS1_ATT_INFO_REQ!\n");
+			//printk("CUSTS1_ATT_INFO_REQ!\n");
             struct custs1_att_info_req const *msg_param = (struct custs1_att_info_req const *)param;
 
             switch (msg_param->att_idx)

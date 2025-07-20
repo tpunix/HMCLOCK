@@ -514,6 +514,10 @@ void clock_draw(int flags)
 {
 	char tbuf[64];
 
+	if(ota_state){
+		return;
+	}
+
 	epd_hw_open();
 
 	epd_update_mode(flags&3);
@@ -571,13 +575,16 @@ void user_svc1_ctrl_wr_ind_handler(ke_msg_id_t const msgid, struct custs1_val_wr
 
 void user_svc1_long_val_wr_ind_handler(ke_msg_id_t const msgid, struct custs1_val_write_ind const *param, ke_task_id_t const dest_id, ke_task_id_t const src_id)
 {
-	printk("Long value: %d\n", param->length);
+	//printk("Long value: %d\n", param->length);
 	if(param->value[0]==0x91){
 		clock_set((uint8_t*)param->value);
 		clock_draw(DRAW_BT|UPDATE_FAST);
 		clock_print();
+	}else if(param->value[0]>=0xa0){
+		ota_handle((u8*)param->value);
 	}
 }
+
 
 void user_svc1_long_val_att_info_req_handler(ke_msg_id_t const msgid, struct custs1_att_info_req const *param, ke_task_id_t const dest_id, ke_task_id_t const src_id)
 {

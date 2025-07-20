@@ -59,7 +59,7 @@
 // Service 1 of the custom server 1
 #define DEF_SVC1_CTRL_POINT_CHAR_LEN     1
 #define DEF_SVC1_ADC_VAL_1_CHAR_LEN      2
-#define DEF_SVC1_LONG_VALUE_CHAR_LEN     48
+#define DEF_SVC1_LONG_VALUE_CHAR_LEN     160
 
 
 /// Custom1 Service Data Base Characteristic enum

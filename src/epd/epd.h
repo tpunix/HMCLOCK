@@ -26,6 +26,7 @@ int sf_sector_erase(int cmd, int addr, int wait);
 int sf_page_write(int addr, u8 *buf, int size);
 int sf_read(int addr, int len, u8 *buf);
 int selflash(int otp_boot);
+int ota_handle(u8 *buf);
 
 // epd_hw
 void epd_hw_init(u32 config0, u32 config1, int w, int h, int mode);

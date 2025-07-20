@@ -86,6 +86,7 @@
  */
 
 extern char *bt_id;
+extern int ota_state;
 
 
 /*
