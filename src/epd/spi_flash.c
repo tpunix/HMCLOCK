@@ -346,6 +346,34 @@ int selflash(int otp_boot)
 	int id = sf_readid();
 	printk("Flash  ID: %08x\n", id);
 
+	sf_read(0x39000, 16, pbuf);
+	printk("39000: ");
+	for(int i=0; i<16; i++){
+		printk(" %02x", pbuf[i]);
+	}
+	printk("\n");
+	printk("EPD Type: %02x\n", pbuf[0]);
+	if(pbuf[1]==0x01){
+		printk("EPD Gpio: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			pbuf[8], pbuf[9], pbuf[10], pbuf[11], pbuf[12], pbuf[13], pbuf[14], pbuf[15]);
+	}
+
+	sf_read(0x3a000, 16, pbuf);
+	printk("3a000: ");
+	for(int i=0; i<16; i++){
+		printk(" %02x", pbuf[i]);
+	}
+	printk("\n");
+
+	int xres = *(u16*)(pbuf+10);
+	int yres = *(u16*)(pbuf+12);
+	if(xres<512 && yres<512){
+		detect_w = xres;
+		detect_h = yres;
+		detect_mode = pbuf[9]? EPD_BWR : EPD_BW;
+		printk("EPD  Res: %dx%d  %d\n", xres, yres, pbuf[9]);
+	}
+
 	int region_table = (int)&Region$$Table$$Base;
 	int firm_size = *(u32*)(region_table+0x10) - 0x07fc0000;
 	printk("Firm size: %08x\n", firm_size);

@@ -73,7 +73,9 @@ int select_font(int id);
 void fb_test(void);
 
 
+#define EPD_BW    0x00
 #define EPD_BWR   0x20
+
 #define MIRROR_H  0x40
 #define MIRROR_V  0x80
 #define ROTATE_0  0x00 // 0
@@ -98,6 +100,12 @@ extern int scr_mode;
 extern int line_bytes;
 extern int scr_padding;
 extern int update_mode;
+
+
+extern int detect_w;
+extern int detect_h;
+extern int detect_mode;
+
 
 extern int win_w;
 extern int win_h;

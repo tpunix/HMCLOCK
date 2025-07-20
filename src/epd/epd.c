@@ -14,6 +14,10 @@ int scr_padding;
 int update_mode;
 int lut_size;
 
+int detect_w = 104;
+int detect_h = 212;
+int detect_mode = EPD_BW;
+
 
 // 窗口参数
 int win_w;
@@ -356,6 +360,7 @@ void epd_screen_update(void)
 	for(i=0; i<win_h*line_bytes; i++){
 		epd_data(fb_bw[i]);
 	}
+
 	if(scr_mode&EPD_BWR){
 		epd_cmd(0x26);
 		for(i=0; i<win_h*line_bytes; i++){
