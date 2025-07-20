@@ -3,50 +3,54 @@
 
 
 
+#define SPI_CTRL0  *(volatile unsigned short*)(0x50001200)
+#define SPI_RXTX0  *(volatile unsigned short*)(0x50001202)
+#define SPI_RXTX1  *(volatile unsigned short*)(0x50001204)
+#define SPI_IACK   *(volatile unsigned short*)(0x50001206)
+#define SPI_CTRL1  *(volatile unsigned short*)(0x50001208)
+
 
 static int spio_clk;
 static int spio_cs;
 static int spio_di;
 static int spio_do;
 
+#define BIT_8  0
+#define BIT_16 1
+#define BIT_32 2
+
+static int spi_bitmode;
+
 /******************************************************************************/
 
 
 #define FSPI_CS(n)  gpio_set(spio_cs,  (n));
-#define FSPI_CK(n)  gpio_set(spio_clk, (n));
-#define FSPI_SI(n)  gpio_set(spio_di,  (n));
-#define FSPI_SO()   gpio_get(spio_do);
 
-#define FSPI_DELAY     10
-
-void fspi_delay(void)
+void fspi_set_bitmode(int mode)
 {
-	int i;
+	spi_bitmode = mode;
 
-	for(i=0; i<FSPI_DELAY; i++){
-		__asm("nop");
-	}
+	SPI_CTRL0 &= 0xfe7e;
+	SPI_CTRL0 |= (mode&3)<<7;
+	SPI_CTRL0 |= 0x0001;
 }
 
-
-int fspi_trans(int byte)
+int fspi_trans(int data)
 {
-	int i, data;
-
-	data = 0;
-	for(i=0; i<8; i++){
-		FSPI_SI(byte&0x80);
-		FSPI_CK(0);
-		fspi_delay();
-
-		data <<= 1;
-		data |= FSPI_SO();
-
-		FSPI_CK(1);
-		fspi_delay();
-		byte <<= 1;
+	if(spi_bitmode==BIT_32){
+		SPI_RXTX1 = data>>16;
 	}
+	SPI_RXTX0 = data;
 
+	while((SPI_CTRL0&0x2000)==0);
+	SPI_IACK = 0;
+
+	data = SPI_RXTX0;
+	if(spi_bitmode==BIT_8){
+		data &= 0xff;
+	}else if(spi_bitmode==BIT_32){
+		data |= (SPI_RXTX1)<<16;
+	}
 	return data;
 }
 
@@ -55,8 +59,8 @@ int fspi_config(u32 gpio_word)
 {
 	spio_clk = (gpio_word>>24)&0xff;
 	spio_cs  = (gpio_word>>16)&0xff;
-	spio_di  = (gpio_word>> 8)&0xff;
-	spio_do  = (gpio_word>> 0)&0xff;
+	spio_do  = (gpio_word>> 8)&0xff;
+	spio_di  = (gpio_word>> 0)&0xff;
 
 	return 0;
 }
@@ -64,14 +68,18 @@ int fspi_config(u32 gpio_word)
 
 int fspi_init(void)
 {
-	gpio_config(spio_clk, 0x0300, 0);
+	SetBits16(CLK_PER_REG, SPI_ENABLE, 1);
+
 	gpio_config(spio_cs,  0x0300, 1);
-	gpio_config(spio_di,  0x0300, 1);
-	gpio_config(spio_do,  0x0100, 1);
+	gpio_config(spio_clk, 0x0307, 0);
+	gpio_config(spio_do,  0x0306, 1);
+	gpio_config(spio_di,  0x0105, 1);
+
+	SPI_CTRL0 = 0x0010;
+	fspi_set_bitmode(BIT_32);
 
 	FSPI_CS(0);
-	fspi_delay();
-	fspi_trans(0xab);
+	fspi_trans(0xab000000);
 	FSPI_CS(1);
 
 	return 0;
@@ -80,6 +88,9 @@ int fspi_init(void)
 
 int fspi_exit(void)
 {
+	SPI_CTRL0 = 0;
+	SetBits16(CLK_PER_REG, SPI_ENABLE, 0);
+
 	gpio_config(spio_cs,  0x0300, 1);
 	gpio_config(spio_clk, 0x0300, 0);
 	gpio_config(spio_do,  0x0300, 0);
@@ -94,68 +105,59 @@ int fspi_exit(void)
 
 int sf_readid(void)
 {
+	fspi_set_bitmode(BIT_32);
 	FSPI_CS(0);
-	fspi_delay();
-
-	fspi_trans(0x90);
-	fspi_trans(0x00);
-	fspi_trans(0x00);
-	fspi_trans(0x00);
-
-	int mid = fspi_trans(0);
-	int pid = fspi_trans(0);
+	fspi_trans(0x90000000);
+	int id = fspi_trans(0);
 	FSPI_CS(1);
-	fspi_delay();
+	
+	id = __REV(id);
+	id &= 0xffff;
 
-	return (mid<<8)|pid;
+	return id;
 }
 
 int sf_status(int id)
 {
 	int status;
-	int cmd = (id)? 0x35 : 0x05;
+	int cmd = (id)? 0x3500 : 0x0500;
 
+	fspi_set_bitmode(BIT_16);
 	FSPI_CS(0);
-	fspi_delay();
-	fspi_trans(cmd);
-	status = fspi_trans(0);
+	status = fspi_trans(cmd);
 	FSPI_CS(1);
-	fspi_delay();
 
 	return status&0xff;
 }
 
 int sf_wstat(int id, int stat)
 {
-	int cmd = (id)? 0x31 : 0x01;
+	int cmd = (id)? 0x3100 : 0x0100;
+	cmd |= stat;
 
 	// status write enable
+	fspi_set_bitmode(BIT_8);
 	FSPI_CS(0);
-	fspi_delay();
 	fspi_trans(0x50);
 	FSPI_CS(1);
-	fspi_delay();
 
+	fspi_set_bitmode(BIT_16);
 	FSPI_CS(0);
-	fspi_delay();
 	fspi_trans(cmd);
-	fspi_trans(stat);
 	FSPI_CS(1);
-	fspi_delay();
 
 	return 0;
 }
 
 int sf_wen(int en)
 {
+	fspi_set_bitmode(BIT_8);
 	FSPI_CS(0);
-	fspi_delay();
 	if(en)
 		fspi_trans(0x06);
 	else
 		fspi_trans(0x04);
 	FSPI_CS(1);
-	fspi_delay();
 
 	return 0;
 }
@@ -168,11 +170,10 @@ int sf_wait(void)
 		status = sf_status(0);
 		if((status&1)==0)
 			break;
-		fspi_delay();
 	}
 
 	status |= sf_status(1)<<8;
-	return status;
+	return status&0x4000;
 }
 
 
@@ -180,14 +181,10 @@ int sf_sector_erase(int cmd, int addr, int wait)
 {
 	sf_wen(1);
 
+	fspi_set_bitmode(BIT_32);
 	FSPI_CS(0);
-	fspi_delay();
-	fspi_trans(0x20);
-	fspi_trans((addr>>16)&0xff);
-	fspi_trans((addr>> 8)&0xff);
-	fspi_trans((addr>> 0)&0xff);
+	fspi_trans((cmd<<24)|addr);
 	FSPI_CS(1);
-	fspi_delay();
 
 	if(wait){
 		int status = sf_wait();
@@ -199,15 +196,16 @@ int sf_sector_erase(int cmd, int addr, int wait)
 
 int sf_erase(int addr, int size, int wait)
 {
-	int status;
+	GLOBAL_INT_DISABLE();
 
+	int status;
 	while(size>0){
-		if((addr%0x8000)==0 && size>=0x8000){
-			status = sf_sector_erase(ERASE_32K, addr, wait);
-			printk("sf_erase: %08x 32K  stat=%04x\n", addr, status);
-			addr += 0x8000;
-			size -= 0x8000;
-		}else
+//		if((addr%0x8000)==0 && size>=0x8000){
+//			status = sf_sector_erase(ERASE_32K, addr, wait);
+//			printk("sf_erase: %08x 32K  stat=%04x\n", addr, status);
+//			addr += 0x8000;
+//			size -= 0x8000;
+//		}else
 		{
 			status = sf_sector_erase(ERASE_4K,  addr, wait);
 			printk("sf_erase: %08x  4K  stat=%04x\n", addr, status);
@@ -216,6 +214,7 @@ int sf_erase(int addr, int size, int wait)
 		}
 	}
 
+	GLOBAL_INT_RESTORE();
 	return 0;
 }
 
@@ -224,22 +223,20 @@ int sf_page_write(int addr, u8 *buf, int size)
 {
 	int i;
 
+	GLOBAL_INT_DISABLE();
 	sf_wen(1);
 
+	fspi_set_bitmode(BIT_32);
 	FSPI_CS(0);
-	fspi_delay();
 
-	fspi_trans(0x02);
-	fspi_trans((addr>>16)&0xff);
-	fspi_trans((addr>> 8)&0xff);
-	fspi_trans((addr>> 0)&0xff);
-
-	for(i=0; i<size; i++){
-		fspi_trans(buf[i]);
+	fspi_trans(0x02000000|addr);
+	for(i=0; i<size; i+=4){
+		int data = *(u32*)(buf+i);
+		fspi_trans(__REV(data));
 	}
 
 	FSPI_CS(1);
-	fspi_delay();
+	GLOBAL_INT_RESTORE();
 	return 0;
 }
 
@@ -248,21 +245,17 @@ int sf_read(int addr, int len, u8 *buf)
 {
 	int i;
 
+	fspi_set_bitmode(BIT_32);
 	FSPI_CS(0);
-	fspi_delay();
 
-	fspi_trans(0x0b);
-	fspi_trans((addr>>16)&0xff);
-	fspi_trans((addr>> 8)&0xff);
-	fspi_trans((addr>> 0)&0xff);
+	fspi_trans(0x03000000|addr);
 
-	fspi_trans(0);
-	for(i=0; i<len; i++){
-		buf[i] = fspi_trans(0);
+	for(i=0; i<len; i+=4){
+		int data = fspi_trans(0);
+		*(u32*)(buf+i) = __REV(data);
 	}
 
 	FSPI_CS(1);
-	fspi_delay();
 
 	return len;
 }
@@ -443,6 +436,24 @@ static int firm_size;
 static int firm_flag;
 
 
+void sf_dumpp(int addr, int size)
+{
+#if 1
+	for(int i=0; i<size; i+=256){
+		sf_read(addr, 256, ota_buf);
+		for(int j=0; j<256; j++){
+			if((j%16)==0){
+				printk("\n%08x: ", addr+j);
+			}
+			printk(" %02x", ota_buf[j]);
+		}
+		printk("\n");
+
+		addr += 256;
+	}
+#endif
+}
+
 int ota_handle(u8 *buf)
 {
 	u8 *pbuf = ota_buf;
@@ -506,15 +517,16 @@ int ota_handle(u8 *buf)
 			);
 		}
 
+		// 先等待上一次写操作完成
+		//fspi_init();
 		int addr = firm_addr+(ota_state-1)*256;
 		sf_page_write(addr, ota_buf, 256);
 		int status = sf_wait();
+		//printk("page_write: %08x  status:%04x\n", addr, status);
 		ota_state += 1;
 	}else if(buf[0]==0xa4){
 		ota_state = 0;
 		arch_set_sleep_mode(ARCH_EXT_SLEEP_ON);
-		// Remap addres 0x00 to ROM and force execution
-		SetWord16(SYS_CTRL_REG, (GetWord16(SYS_CTRL_REG) & ~REMAP_ADR0) | SW_RESET );
 	}
 
 	return 0;
