@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HM CLOCK</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3B82F6',
+            secondary: '#10B981',
+            accent: '#8B5CF6',
+            warning: '#F59E0B',
+            danger: '#EF4444',
+            dark: '#1E293B',
+            light: '#F8FAFC'
+          },
+          fontFamily: {
+            inter: ['Inter', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .btn-hover {
+        @apply transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5;
+      }
+      .card-effect {
+        @apply bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300;
+      }
+      .text-gradient {
+        @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+      }
+    }
+  </style>
+  
+  <style>
+    body { 
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f9ff;
+      background-image: 
+        radial-gradient(at 40% 20%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+    }
+    
+    .log-entry {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen p-4 md:p-6 flex justify-center items-start font-inter text-dark">
+  <div class="w-full max-w-4xl">
+    <!-- 头部标题 -->
+    <header class="mb-6 text-center">
+      <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-gradient mb-2">HM CLOCK 控制中心</h1>
+    </header>
+    
+    <!-- 主内容卡片 -->
+    <div class="card-effect p-5 md:p-6 space-y-6">
+      <!-- 控制按钮区域 -->
+      <div class="flex flex-wrap gap-3 md:gap-4">
+        <button id="connect-button" class="bg-primary text-white px-5 py-2.5 rounded-lg flex items-center gap-2 btn-hover font-medium">
+          <i class="fa fa-bluetooth"></i> 连接设备
+        </button>
+        <button id="setime-button" class="bg-warning text-white px-5 py-2.5 rounded-lg flex items-center gap-2 btn-hover font-medium opacity-50 cursor-not-allowed" disabled>
+          <i class="fa fa-clock-o"></i> 同步时间
+        </button>
+        <button id="upfirm-button" class="bg-accent text-white px-5 py-2.5 rounded-lg flex items-center gap-2 btn-hover font-medium opacity-50 cursor-not-allowed" disabled>
+          <i class="fa fa-refresh"></i> 固件升级
+        </button>
+        <button id="send90-button" class="bg-secondary text-white px-5 py-2.5 rounded-lg flex items-center gap-2 btn-hover font-medium opacity-50 cursor-not-allowed" disabled>
+          <i class="fa fa-send"></i> 切换时制
+        </button>
+      </div>
+      
+      <!-- 设备信息区域 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+            <i class="fa fa-microchip"></i>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">设备名称</p>
+            <p id="device_name" class="font-semibold">未连接</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+            <i class="fa fa-bolt"></i>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">当前电压</p>
+            <p id="current_voltage" class="font-semibold">--.- V</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+            <i class="fa fa-calendar"></i>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">设备时间</p>
+            <p id="current_time" class="font-semibold">--:--:--</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+            <i class="fa fa-laptop"></i>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">系统时间</p>
+            <p id="system_time" class="font-semibold">加载中...</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 进度条区域 -->
+      <div id="progress-container" class="hidden">
+        <p class="text-sm font-medium text-gray-600 mb-1">固件升级进度</p>
+        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div id="update_progress_bar" class="h-full bg-gradient-to-r from-primary to-accent w-0 transition-all duration-300"></div>
+        </div>
+        <p id="update_progress_text" class="text-xs text-gray-500 mt-1">0%</p>
+        <div id="update_progress" class="hidden"></div>
+      </div>
+      
+      <!-- 日志终端区域 -->
+      <div class="space-y-2">
+        <div class="flex justify-between items-center">
+          <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+            <i class="fa fa-terminal text-primary"></i> 设备日志
+          </h3>
+          <button id="clear-log-btn" class="text-xs text-gray-500 hover:text-danger transition-colors">
+            <i class="fa fa-trash-o"></i> 清空日志
+          </button>
+        </div>
+        
+        <div id="log-window" class="bg-gray-900 text-gray-100 text-xs md:text-sm rounded-lg h-48 md:h-64 overflow-y-auto p-3 font-mono">
+          <div class="text-gray-400 log-entry">终端已启动，等待设备连接...</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 页脚信息 -->
+    <footer class="mt-6 text-center text-xs text-gray-500">
+      <p>HM CLOCK蓝牙控制工具 &copy; https://github.com/tpunix/HMCLOCK</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.sheetjs.com/crc-32-latest/package/crc32.js"></script>
+  
+  <script>
+    // 系统时间更新
+    function updateSystemTime() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      const dateString = now.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      document.getElementById('system_time').textContent = `${dateString} ${timeString}`;
+    }
+    
+    // 初始化更新系统时间并设置定时器
+    updateSystemTime();
+    setInterval(updateSystemTime, 1000);
+    
+    // 日志系统
+    const logWindow = document.getElementById('log-window');
+    const clearLogBtn = document.getElementById('clear-log-btn');
+    
+    // 自定义日志函数
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      
+      const logLine = document.createElement('div');
+      logLine.className = 'log-entry mb-1 border-b border-gray-800 pb-1';
+      
+      let typeIcon = '';
+      let typeColor = '';
+      
+      switch(type) {
+        case 'success':
+          typeIcon = '<span class="text-green-400 mr-1"><i class="fa fa-check-circle"></i></span>';
+          typeColor = 'text-green-300';
+          break;
+        case 'error':
+          typeIcon = '<span class="text-red-400 mr-1"><i class="fa fa-exclamation-circle"></i></span>';
+          typeColor = 'text-red-300';
+          break;
+        case 'warning':
+          typeIcon = '<span class="text-yellow-400 mr-1"><i class="fa fa-exclamation-triangle"></i></span>';
+          typeColor = 'text-yellow-300';
+          break;
+        case 'info':
+        default:
+          typeIcon = '<span class="text-blue-400 mr-1"><i class="fa fa-info-circle"></i></span>';
+          typeColor = 'text-gray-300';
+      }
+      
+      logLine.innerHTML = `<span class="text-gray-500 mr-2">[${timestamp}]</span>${typeIcon}<span class="${typeColor}">${message}</span>`;
+      logWindow.appendChild(logLine);
+      logWindow.scrollTop = logWindow.scrollHeight;
+    }
+    
+    // 替换console.log
+    const originalLog = console.log;
+    console.log = function (...args) {
+      originalLog(...args);
+      log(args.join(" "));
+    };
+    
+    // 清空日志
+    clearLogBtn.addEventListener('click', () => {
+      logWindow.innerHTML = '<div class="text-gray-400 log-entry">日志已清空</div>';
+    });
+
+    // 核心功能代码
+    var connected = false;
+    var device = null;
+    var longValue = null;
+    var deviceTimeInterval = null; // 设备时间更新定时器
+    var deviceTimeBase = null;     // 设备时间基准值
+    
+    // 格式化时间显示
+    function formatTime(year, month, mday, hour, min, sec) {
+      month += 1;
+      return `${year}-${month.toString().padStart(2, '0')}-${mday.toString().padStart(2, '0')} ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    }
+    
+    // 更新设备时间显示
+    function updateDeviceTime() {
+      if (!deviceTimeBase) return;
+      
+      // 获取基准时间
+      let { year, month, mday, hour, minute, second } = deviceTimeBase;
+      
+      // 计算从基准时间开始经过的秒数
+      const now = new Date();
+      const elapsedSeconds = Math.floor((now - deviceTimeBase.timestamp) / 1000);
+      
+      // 更新时间
+      let totalSeconds = second + elapsedSeconds;
+      second = totalSeconds % 60;
+      let totalMinutes = minute + Math.floor(totalSeconds / 60);
+      minute = totalMinutes % 60;
+      let totalHours = hour + Math.floor(totalMinutes / 60);
+      hour = totalHours % 24;
+      // 此处忽略天数变化，因为设备时间通常不会长时间运行
+      
+      // 更新显示
+      document.getElementById('current_time').textContent = formatTime(year, month, mday, hour, minute, second);
+    }
+
+    function onClick() {
+      if(connected) disconnect();
+      else connectToDevice();
+    }
+
+    // 连接设备
+    async function connectToDevice() {
+      try {
+        // 更新按钮状态
+        const connectButton = document.getElementById('connect-button');
+        connectButton.disabled = true;
+        connectButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 连接中...';
+        
+        console.log('请求设备...');
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "DLG-CLOCK" }],
+          optionalServices: [ 0xff00 ]
+        });
+        console.log('设备名称:', device.name);
+        document.getElementById('device_name').textContent = device.name;
+        device.ongattserverdisconnected = onDisconnect;
+
+        let server = await device.gatt.connect();
+        console.log('设备已连接');
+
+        let service = await server.getPrimaryService(0xff00);
+        let ctrlPoint = await service.getCharacteristic(0xff03);
+        let adc1Value = await service.getCharacteristic(0xff02);
+        longValue = await service.getCharacteristic(0xff01);
+
+        let cur_voltage = await adc1Value.readValue();
+        console.log('当前电压:', cur_voltage.getUint16(0, true) / 1000 + 'V');
+        document.getElementById('current_voltage').textContent = (cur_voltage.getUint16(0, true) / 1000).toFixed(2) + ' V';
+
+        let cur_time = await longValue.readValue();
+        let year = cur_time.getUint16(0, true),
+            month = cur_time.getUint8(2),
+            mday = cur_time.getUint8(3),
+            hour = cur_time.getUint8(4),
+            minute = cur_time.getUint8(5),
+            second = cur_time.getUint8(6);
+        
+        // 保存设备时间基准值和当前时间戳
+        deviceTimeBase = {
+          year, month, mday, hour, minute, second,
+          timestamp: new Date()
+        };
+        
+        // 立即更新设备时间显示
+        updateDeviceTime();
+        
+        // 设置定时器每秒更新一次设备时间
+        if (deviceTimeInterval) clearInterval(deviceTimeInterval);
+        deviceTimeInterval = setInterval(updateDeviceTime, 1000);
+
+        let now = new Date();
+        document.getElementById('system_time').textContent = formatTime(
+          now.getFullYear(), now.getMonth(), now.getDate(),
+          now.getHours(), now.getMinutes(), now.getSeconds()
+        );
+
+        connected = true;
+        document.getElementById('setime-button').disabled = false;
+        document.getElementById('upfirm-button').disabled = false;
+        document.getElementById('send90-button').disabled = false;
+        document.getElementById('setime-button').classList.remove('opacity-50', 'cursor-not-allowed');
+        document.getElementById('upfirm-button').classList.remove('opacity-50', 'cursor-not-allowed');
+        document.getElementById('send90-button').classList.remove('opacity-50', 'cursor-not-allowed');
+        
+        connectButton.innerHTML = '<i class="fa fa-disconnect"></i> 断开连接';
+        connectButton.disabled = false;
+      } catch (error) {
+        console.log('连接失败:', error);
+        disconnect();
+      }
+    }
+
+    // 对时功能
+    async function onSetTime() {
+      const setimeButton = document.getElementById('setime-button');
+      setimeButton.disabled = true;
+      setimeButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 同步中...';
+      
+      try {
+        let now = new Date();
+
+        let year = now.getFullYear(),
+            month = now.getMonth(),
+            mday = now.getDate(),
+            wday = now.getDay(),
+            hour = now.getHours(),
+            minute = now.getMinutes(),
+            second = now.getSeconds();
+
+        let locale_str = now.toLocaleDateString('zh-CN-u-ca-chinese',{month:'numeric',day:'numeric'});
+        let l_month = locale_str.startsWith('闰') ? 128 : 0;
+        if (l_month) locale_str = locale_str.slice(1);
+        let [l_month_num, l_day] = locale_str.split('-').map(Number);
+        l_month += l_month_num;
+        let l_year = parseInt(now.toLocaleDateString('zh-CN-u-ca-chinese',{year:'numeric'}));
+        console.log('农历年:', l_year, '月:', l_month, '日:', l_day);
+
+        let buf = new Uint8Array(12);
+        buf.set([0x91, year % 256, Math.floor(year / 256), month, mday, hour, minute, second, wday, l_year - 2020, l_month - 1, l_day]);
+        await longValue.writeValue(buf);
+
+        // 更新设备时间基准值
+        deviceTimeBase = {
+          year, month: month, mday, hour, minute, second,
+          timestamp: new Date()
+        };
+        
+        // 立即更新设备时间显示
+        updateDeviceTime();
+        
+        console.log('同步时间成功!');
+      } catch (error) {
+        console.log('同步时间失败:', error);
+      } finally {
+        setimeButton.innerHTML = '<i class="fa fa-clock-o"></i> 同步时间';
+        setimeButton.disabled = false;
+      }
+    }
+
+    // 文件读取辅助函数
+    function readFileAsArrayBuffer(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // 固件标识查找
+    function find_patten(target, patten) {
+      for (let i = 0; i <= target.length - patten.length; i++) {
+        let match = true;
+        for (let j = 0; j < patten.length; j++) {
+          if (target[i + j] !== patten[j]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) return i;
+      }
+      return -1;
+    }
+    
+    // 发送命令
+    async function onSend90() {
+      const send90Button = document.getElementById('send90-button');
+      send90Button.disabled = true;
+      send90Button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 发送中...';
+      
+      try {
+        let buf = new Uint8Array([0x90]);  // 构造单字节命令
+        await longValue.writeValue(buf);
+        console.log('已发送切换命令');
+      } catch (err) {
+        console.log('发送失败:', err);
+      } finally {
+        send90Button.innerHTML = '<i class="fa fa-send"></i> 发送命令';
+        send90Button.disabled = false;
+      }
+    }
+    
+    // 固件升级
+    async function onUpdate() {
+      const upfirmButton = document.getElementById('upfirm-button');
+      upfirmButton.disabled = true;
+      upfirmButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 升级中...';
+      
+      document.getElementById('progress-container').classList.remove('hidden');
+      
+      let firm_buf, firm_size;
+
+      try {
+        console.log('准备打开文件');
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'Firm files', accept: { 'text/plain': ['.bin'] } }]
+        });
+        const file = await handle.getFile();
+        let abuf = await readFileAsArrayBuffer(file);
+        firm_buf = new Uint8Array(abuf);
+        firm_size = file.size;
+      } catch (err) {
+        console.log('文件读取失败:', err);
+        upfirmButton.innerHTML = '<i class="fa fa-refresh"></i> 固件升级';
+        upfirmButton.disabled = false;
+        document.getElementById('progress-container').classList.add('hidden');
+        return;
+      }
+
+      let firm_magic = new Uint8Array([0x79, 0x13, 0xa5, 0xf9, 0x86, 0xec, 0x5a, 0x06]);
+      let pos = find_patten(firm_buf, firm_magic);
+      if (pos == -1) {
+        console.log('无效固件: 未找到版本号!');
+        upfirmButton.innerHTML = '<i class="fa fa-refresh"></i> 固件升级';
+        upfirmButton.disabled = false;
+        document.getElementById('progress-container').classList.add('hidden');
+        return;
+      }
+
+      let firm_ver = firm_buf[pos + 9] * 256 + firm_buf[pos + 8];
+      let firm_crc = CRC32.buf(firm_buf);
+      console.log('固件版本:', firm_ver, '大小:', firm_size, 'CRC:', (firm_crc >>> 0).toString(16));
+
+      let buf = new Uint8Array(136);
+      let view = new DataView(buf.buffer);
+      buf[0] = 0xa0;
+      view.setUint16(2, firm_size, true);
+      await longValue.writeValue(buf);
+
+      let sent = 0;
+      const totalSize = firm_size + 64;
+      const progressBar = document.getElementById('update_progress_bar');
+      const progressText = document.getElementById('update_progress_text');
+      
+      try {
+        for (let i = 0; i < totalSize; i += 256) {
+          buf.fill(0xff);
+          if (i === 0) {
+            view.setUint32(8, 0x00aa5170, true);
+            view.setUint32(12, firm_size, true);
+            view.setUint32(16, firm_crc, true);
+            view.setUint32(36, 0xa50f0000 + firm_ver, true);
+            buf[40] = 0;
+            buf[0] = 0xa2;
+            buf.set(firm_buf.slice(sent, sent + 64), 72);
+            await longValue.writeValue(buf);
+            sent += 64;
+          } else {
+            buf[0] = 0xa2;
+            buf.set(firm_buf.slice(sent, sent + 128), 8);
+            await longValue.writeValue(buf);
+            sent += 128;
+          }
+          buf[0] = 0xa3;
+          buf.set(firm_buf.slice(sent, sent + 128), 8);
+          await longValue.writeValue(buf);
+          sent += 128;
+
+          // 更新进度条
+          const progress = Math.min(Math.round(100 * sent / totalSize), 100);
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `${progress}%`;
+          document.getElementById('update_progress').textContent = `升级进度: ${progress}%`;
+        }
+
+        buf[0] = 0xa4;
+        buf.fill(0, 1, 4);
+        await longValue.writeValue(buf);
+        console.log('升级完成');
+      } catch (error) {
+        console.log('升级结束，蓝牙已断开');
+      } finally {
+        upfirmButton.innerHTML = '<i class="fa fa-refresh"></i> 固件升级';
+        upfirmButton.disabled = false;
+        document.getElementById('progress-container').classList.add('hidden');
+      }
+    }
+
+    // 断开连接
+    function disconnect() {
+      const connectButton = document.getElementById('connect-button');
+      connectButton.disabled = true;
+      connectButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 断开中...';
+      
+      document.getElementById('setime-button').disabled = true;
+      document.getElementById('send90-button').disabled = true;
+      document.getElementById('upfirm-button').disabled = true;
+      
+      document.getElementById('setime-button').classList.add('opacity-50', 'cursor-not-allowed');
+      document.getElementById('upfirm-button').classList.add('opacity-50', 'cursor-not-allowed');
+      document.getElementById('send90-button').classList.add('opacity-50', 'cursor-not-allowed');
+
+      // 清除设备时间更新定时器
+      if (deviceTimeInterval) {
+        clearInterval(deviceTimeInterval);
+        deviceTimeInterval = null;
+      }
+      deviceTimeBase = null;
+
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+      }
+      onDisconnect();
+    }
+
+    // 断开回调
+    function onDisconnect() {
+      device = null;
+      connected = false;
+      
+      document.getElementById('device_name').textContent = "未连接";
+      document.getElementById('current_voltage').textContent = "--.- V";
+      document.getElementById('current_time').textContent = "--:--:--";
+
+      const connectButton = document.getElementById('connect-button');
+      connectButton.innerHTML = '<i class="fa fa-bluetooth"></i> 连接设备';
+      connectButton.disabled = false;
+      
+      console.log('设备已断开连接');
+    }
+
+    // 事件绑定
+    document.getElementById('connect-button').addEventListener('click', onClick);
+    document.getElementById('setime-button').addEventListener('click', onSetTime);
+    document.getElementById('upfirm-button').addEventListener('click', onUpdate);
+    document.getElementById('send90-button').addEventListener('click', onSend90);
+  </script>
+</body>
+</html>
