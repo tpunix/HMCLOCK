@@ -104,22 +104,27 @@ void draw_box(int x1, int y1, int x2, int y2, int color)
 
 
 #include "sfont.h"
-#include "font56.h"
+#include "sfont16.h"
+#include "font50.h"
+#include "font66.h"
 
-u8 *current_font = (u8*)sfont;
+const u8 *font_list[6] = {
+	sfont,
+	F_DSEG7_50,
+	sfont16,
+	F_DSEG7_66,
+};
+
+const u8 *current_font = (u8*)sfont;
 
 int select_font(int id)
 {
-	if(id==0)
-		current_font = (u8*)sfont;
-	else
-		current_font = (u8*)F_DSEG7_56;
-	
+	current_font = font_list[id];
 	return 0;
 }
 
 
-static u8 *find_font(u8 *font, int ucs)
+static const u8 *find_font(const u8 *font, int ucs)
 {
 	int total = *(u16*)font;
 	int i;
@@ -136,14 +141,9 @@ static u8 *find_font(u8 *font, int ucs)
 }
 
 
-int fb_draw_font(int x, int y, int ucs, int color)
+int fb_draw_font_info(int x, int y, const u8 *font_data, int color)
 {
 	int r, c;
-	u8 *font_data = find_font(current_font, ucs);
-	if(font_data==NULL){
-		printk("fb_draw %04x: not found!\n");
-		font_data = find_font(current_font, '?');
-	}
 
 	int ft_adv = font_data[0];
 	int ft_bw = font_data[1];
@@ -170,6 +170,18 @@ int fb_draw_font(int x, int y, int ucs, int color)
 	}
 
 	return ft_adv;
+}
+
+
+int fb_draw_font(int x, int y, int ucs, int color)
+{
+	const u8 *font_data = find_font(current_font, ucs);
+	if(font_data==NULL){
+		printf("fb_draw %04x: not found!\n", ucs);
+		return -1;
+	}
+
+	return fb_draw_font_info(x, y, font_data, color);
 }
 
 

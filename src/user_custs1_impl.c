@@ -452,6 +452,9 @@ void get_holiday(void)
 }
 
 
+/****************************************************************************************/
+
+
 static uint8_t batt_cal(uint16_t adc_sample)
 {
     uint8_t batt_lvl;
@@ -481,18 +484,65 @@ static void draw_batt(int x, int y)
 	draw_box(x+12-p, y-2, x+12, y+2, BLACK);
 }
 
+
+const u8 font_bt[] = {
+	0x08, 0x08, 0x0f, 0x00, 0x00,
+	0x10, 0x18, 0x14, 0x92, 0x51, 0x32, 0x14, 0x18,
+	0x14, 0x32, 0x51, 0x92, 0x14, 0x18, 0x10,
+};
+
 static void draw_bt(int x, int y)
+{
+	fb_draw_font_info(x, y, font_bt, BLACK);
+}
+
+
+/****************************************************************************************/
+
+typedef struct {
+	int xres, yres;
+	int font_char;
+	int font_dseg;
+	u16 x[8];
+	u16 y[8];
+}LAYOUT;
+
+// 坐标0: 公历日期
+// 坐标1: 蓝牙图标
+// 坐标2: 电池图标
+// 坐标3: 时间
+// 坐标4: 农历日期
+// 坐标5: 节气
+// 坐标6: 节日
+// 坐标7: 上下午
+
+LAYOUT layouts[3] = {
+	{212, 104, 0, 1,
+		{15, 172, 190,  16,  12,  98, 150, 12},
+		{ 6,   7,  14,  27,  82,  82,  82, 44},
+	},
+	{250, 122, 2, 3,
+		{15, 206, 226,  12,  12, 118, 176, 15},
+		{ 6,   8,  15,  28,  98,  98,  98, 50},
+	},
+	{296, 128, 2, 3,
+		{15, 246, 268,  30,  12, 140, 220, 15,},
+		{ 6,   8,  15,  30, 102, 102, 102, 52,},
+	},
+};
+
+int current_layout = 0;
+
+void select_layout(int xres, int yres)
 {
 	int i;
 
-	draw_vline(x, y-4, y+4, BLACK);
-	
-	for(i=0; i<5; i++){
-		draw_pixel(x-2+i, y-2+i, BLACK);
-		draw_pixel(x-2+i, y+2-i, BLACK);
+	for(i=0; i<3; i++){
+		if(layouts[i].xres==xres && layouts[i].yres==yres){
+			current_layout = i;
+			return;
+		}
 	}
-	draw_pixel(x+1, y-3, BLACK);
-	draw_pixel(x+1, y+3, BLACK);
 }
 
 
@@ -513,6 +563,7 @@ static void epd_wait_timer(void)
 void clock_draw(int flags)
 {
 	char tbuf[64];
+	LAYOUT *lt = &layouts[current_layout];
 
 	if(ota_state){
 		return;
@@ -526,32 +577,33 @@ void clock_draw(int flags)
 	memset(fb_rr, 0x00, scr_h*line_bytes);
 
 	// 显示电池电量
-	draw_batt(190, 13);
+	draw_batt(lt->x[2], lt->y[2]);
 	if(flags&DRAW_BT){
 		// 显示蓝牙图标
-		draw_bt(180, 13);
+		draw_bt(lt->x[1], lt->y[1]);
 	}
 
 	// 使用大字显示时间
-	select_font(1);
+	select_font(lt->font_dseg);
 	sprintf(tbuf, "%02d:%02d", hour, minute);
-	draw_text(12, 25, tbuf, BLACK);
+	draw_text(lt->x[3], lt->y[3], tbuf, BLACK);
 
 	// 显示公历日期
 	sprintf(tbuf, "%4d年%2d月%2d日   星期%s", year, month+1, date+1, wday_str[wday]);
-	select_font(0);
-	draw_text(15, 8, tbuf, BLACK);
+	select_font(lt->font_char);
+	draw_text(lt->x[0], lt->y[0], tbuf, BLACK);
 
 	// 显示农历日期(不显示年)
 	ldate_str(tbuf);
-	draw_text(12, 85, tbuf, BLACK);
-	// 显示节气与节假日
+	draw_text(lt->x[4], lt->y[4], tbuf, BLACK);
+	// 显示节气
 	if(jieqi_str)
-		draw_text( 98, 85, jieqi_str, BLACK);
+		draw_text(lt->x[5], lt->y[5], jieqi_str, BLACK);
+	// 显示节假日
 	if(flags&DRAW_BT){
-		draw_text(152, 85, bt_id, BLACK);
+		draw_text(lt->x[6], lt->y[6], bt_id, BLACK);
 	}else if(holiday_str){
-		draw_text(152, 85, holiday_str, BLACK);
+		draw_text(lt->x[6], lt->y[6], holiday_str, BLACK);
 	}
 
 	// 墨水屏更新显示
