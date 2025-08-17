@@ -69,6 +69,12 @@ const u8 *font_list[6] = {
 	F_DSEG7_66,
 };
 
+const u8 font_bt[] = {
+	0x08, 0x08, 0x0f, 0x00, 0x00,
+	0x10, 0x18, 0x14, 0x92, 0x51, 0x32, 0x14, 0x18,
+	0x14, 0x32, 0x51, 0x92, 0x14, 0x18, 0x10,
+};
+
 const u8 *current_font = (u8*)sfont;
 
 int select_font(int id)
@@ -95,13 +101,9 @@ static const u8 *find_font(const u8 *font, int ucs)
 }
 
 
-int fb_draw_font(int x, int y, int ucs, int color)
+int fb_draw_font_info(int x, int y, const u8 *font_data, int color)
 {
 	int r, c;
-	const u8 *font_data = find_font(current_font, ucs);
-	if(font_data==NULL){
-		printf("fb_draw %04x: not found!\n", ucs);
-	}
 
 	int ft_adv = font_data[0];
 	int ft_bw = font_data[1];
@@ -128,6 +130,18 @@ int fb_draw_font(int x, int y, int ucs, int color)
 	}
 
 	return ft_adv;
+}
+
+
+int fb_draw_font(int x, int y, int ucs, int color)
+{
+	const u8 *font_data = find_font(current_font, ucs);
+	if(font_data==NULL){
+		printf("fb_draw %04x: not found!\n", ucs);
+		return -1;
+	}
+
+	return fb_draw_font_info(x, y, font_data, color);
 }
 
 
@@ -172,25 +186,52 @@ char *wday_str[] = {"日", "一", "二", "三", "四", "五", "六"};
 
 static int wday = 0;
 
+
 typedef struct {
 	int xres, yres;
 	int font_char;
 	int font_dseg;
-	int top;
-	int mid;
-	int bottom;
-	int t1;
-	int m1;
-	int b1;
+	u16 x[8];
+	u16 y[8];
 }LAYOUT;
 
+// 坐标0: 公历日期
+// 坐标1: 蓝牙图标
+// 坐标2: 电池图标
+// 坐标3: 时间
+// 坐标4: 农历日期
+// 坐标5: 节气
+// 坐标6: 节日
+// 坐标7: 上下午
+
 LAYOUT layouts[3] = {
-	{212, 104, 0, 2, 6, 27,  82, 15, 20, 12},
-	{250, 122, 1, 3, 6, 28,  98, 15, 16, 12},
-	{296, 128, 1, 3, 6, 30, 102, 15, 36, 12},
+	{212, 104, 0, 2,
+		{15, 172, 190,  16,  12,  98, 150, 12},
+		{ 6,   7,  14,  27,  82,  82,  82, 44},
+	},
+	{250, 122, 1, 3,
+		{15, 206, 226,  12,  12, 118, 176, 15},
+		{ 6,   8,  15,  28,  98,  98,  98, 50},
+	},
+	{296, 128, 1, 3,
+		{15, 246, 268,  30,  12, 140, 220, 15,},
+		{ 6,   8,  15,  30, 102, 102, 102, 52,},
+	},
 };
 
 int current_layout = 0;
+
+
+static void draw_batt(int x, int y, int level)
+{
+	int p = level;
+
+	draw_rect(x, y-4, x+14, y+4, BLACK);
+	draw_box(x-2, y-1, x-1, y+1, BLACK);
+
+	draw_box(x+12-p, y-2, x+12, y+2, BLACK);
+}
+
 
 void fb_test(void)
 {
@@ -200,19 +241,40 @@ void fb_test(void)
 	select_font(lt->font_char);
 	char tbuf[64];
 	sprintf(tbuf, "%4d年%2d月%2d日 星期%s", 2025, 4, 29, wday_str[wday]);
-	draw_text(lt->t1, lt->top, tbuf, BLACK);
+	draw_text(lt->x[0], lt->y[0], tbuf, BLACK);
+
+	// 显示蓝牙图标
+	fb_draw_font_info(lt->x[1], lt->y[1], font_bt, BLACK);
+
+	// 显示电池图标
+	draw_batt(lt->x[2], lt->y[2], 9);
+
+
 	// 显示农历日期(不显示年)
-	sprintf(tbuf, "%s月%s日", wday_str[wday], wday_str[wday]);
-	draw_text(lt->b1, lt->bottom, tbuf, BLACK);
+	sprintf(tbuf, "%s月%s日", wday_str[wday+1], wday_str[wday+2]);
+	draw_text(lt->x[4], lt->y[4], tbuf, BLACK);
+
+	// 显示节气
+	strcpy(tbuf, "小寒");
+	draw_text(lt->x[5], lt->y[5], tbuf, BLACK);
+
+	// 显示节日
+	strcpy(tbuf, "中秋节");
+	draw_text(lt->x[6], lt->y[6], tbuf, BLACK);
+
+	// 使用大字显示时间
+	select_font(lt->font_dseg);
+	sprintf(tbuf, "%2d:%02d", 12+wday, 31+wday);
+	draw_text(lt->x[3], lt->y[3], tbuf, BLACK);
+
+	select_font(lt->font_char);
+	draw_text(lt->x[7], lt->y[7], "上午", BLACK);
+
 
 	wday += 1;
 	if(wday==7)
 		wday = 0;
 
-	// 使用大字显示时间
-	select_font(lt->font_dseg);
-	sprintf(tbuf, "%02d:%02d", 2+wday, 31+wday);
-	draw_text(lt->m1, lt->mid, tbuf, BLACK);
 }
 
 
@@ -220,22 +282,24 @@ void fb_test(void)
 
 int main(int argc, char *argv[])
 {
-	int scr_w, scr_h;
+	int i, scr_w, scr_h;
 
+	for(i=0; i<3; i++){
+		current_layout = i;
+		scr_w = layouts[i].xres;
+		scr_h = layouts[i].yres;
+		printf("Layout %d: %dx%d\n", i, scr_w, scr_h);
 
-//	scr_w = 212; scr_h = 104; current_layout = 0;
-//	scr_w = 250; scr_h = 122; current_layout = 1;
-	scr_w = 296; scr_h = 128; current_layout = 2;
+		gdifb_init(scr_w, scr_h);
+		draw_box(0, 0, scr_w-1, scr_h-1, WHITE);
+		draw_rect(0, 0, scr_w-1, scr_h-1, RED);
 
+		fb_test();
 
-	gdifb_init(scr_w, scr_h);
-	draw_box(0, 0, scr_w-1, scr_h-1, WHITE);
-	draw_rect(0, 0, scr_w-1, scr_h-1, RED);
-
-	fb_test();
-
-	gdifb_flush();
-	gdifb_exit();
+		gdifb_flush();
+		gdifb_waitkey();
+		gdifb_exit(1);
+	}
 
 	return 0;
 }

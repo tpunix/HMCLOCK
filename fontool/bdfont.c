@@ -296,6 +296,10 @@ int load_ttf(char *ttf_name)
 		}
 	}
 
+	// 针对7段数字字体的空格，将其宽度处理成和数字一样。
+	if(font_size>24 && ctab[0x20] && ctab[0x30]){
+		ctab[0x20]->advance = ctab[0x30]->advance;
+	}
 
 	FT_Done_Face(ft_face);
 	FT_Done_FreeType(ft_lib);

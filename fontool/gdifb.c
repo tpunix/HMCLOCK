@@ -20,6 +20,7 @@ static HBITMAP hbmp;
 static HDC hmemdc;
 
 static HANDLE h_gdifb;
+static HANDLE h_window;
 static DWORD gdifb_id;
 static HWND gdifb;
 
@@ -95,7 +96,6 @@ void memdc_create(HWND hwnd)
 
 BOOL InitInstance()
 {
-	HWND hWnd;
 	DWORD style = WS_OVERLAPPEDWINDOW&~WS_SIZEBOX&~WS_MAXIMIZEBOX;
 	RECT rect;
        
@@ -105,18 +105,18 @@ BOOL InitInstance()
 	rect.bottom = height;
 	AdjustWindowRect(&rect, style, FALSE);
 
-	hWnd=CreateWindow("GDI_FB", "GDI_FB", style, CW_USEDEFAULT, 0,
+	h_window = CreateWindow("GDI_FB", "GDI_FB", style, CW_USEDEFAULT, 0,
 		rect.right-rect.left, rect.bottom-rect.top,
 		0, 0, hInst, 0);
 
-	if (!hWnd){
+	if (!h_window){
 		return FALSE;
 	}
 
-	memdc_create(hWnd);
+	memdc_create(h_window);
 
-	ShowWindow(hWnd, SW_SHOWDEFAULT);
-	UpdateWindow(hWnd);
+	ShowWindow(h_window, SW_SHOWDEFAULT);
+	UpdateWindow(h_window);
 
 	return TRUE;
 }
@@ -248,8 +248,12 @@ int gdifb_init(int w, int h)
 }
 
 
-int gdifb_exit(void)
+int gdifb_exit(int force)
 {
+	if(force){
+		SendMessage(h_window, WM_CLOSE, 0, 0);
+	}
+
 	WaitForSingleObject(h_gdifb,INFINITE);
 	CloseHandle(h_gdifb);
 

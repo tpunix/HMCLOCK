@@ -5,7 +5,7 @@ extern unsigned char *gdifbuf;
 
 int gdifb_init(int w, int h);
 void gdifb_flush(void);
-int gdifb_exit(void);
+int gdifb_exit(int force);
 
 
 void gdifb_textout(int x, int y, char *text);
