@@ -66,7 +66,7 @@
  ****************************************************************************************
  */
 
-uint8_t app_connection_idx                      __SECTION_ZERO("retention_mem_area0");
+int app_connection_idx                          __SECTION_ZERO("retention_mem_area0");
 timer_hnd app_clock_timer_used                  __SECTION_ZERO("retention_mem_area0"); //@RETENTION MEMORY
 timer_hnd app_param_update_request_timer_used   __SECTION_ZERO("retention_mem_area0");
 
@@ -76,6 +76,8 @@ static int otp_boot;
 static char adv_name[20];
 char *bt_id = adv_name+12;
 int clock_interval;
+int clock_fixup_value;
+int clock_fixup_count;
 
 const volatile u32 epd_version[3] = {0xF9A51379, ~0xF9A51379, EPD_VERSION};
 
@@ -180,6 +182,9 @@ void user_app_init(void)
 	app_clock_timer_used = EASY_TIMER_INVALID_TIMER;
 
 	clock_interval = 60; // 60s
+	clock_fixup_value = 0;
+	clock_fixup_count = 0;
+
 	adv_state = 0;
 	fspi_config(0x00030605);
 
@@ -192,16 +197,47 @@ void user_app_init(void)
 	}
 
 
+	app_connection_idx = -1;
     default_app_on_init();
+}
+
+
+// 时钟快慢修正
+//   minutes : 自上次对时后，经过的分钟数
+//   diff_sec: 自上次对时后，误差的秒数
+//       误差为正数，说明时钟快了。将定时器加上一个修正值，让它慢一点。
+//       误差为负数，说明时钟慢了。将定时器减去一个修正值，让它快一点。
+void clock_fixup_set(int diff_sec, int minutes)
+{
+	int new_fixup_value = diff_sec*100*4096/minutes;
+	clock_fixup_value += new_fixup_value;
+}
+
+
+static int clock_fixup(void)
+{
+	int value;
+
+	clock_fixup_count += clock_fixup_value;
+
+	value = clock_fixup_count>>12;
+	clock_fixup_count &= 0xfff;
+
+	return value;
 }
 
 
 static void app_clock_timer_cb(void)
 {
-	app_clock_timer_used = app_easy_timer(clock_interval*100, app_clock_timer_cb);
+	int adj = clock_fixup();
+	app_clock_timer_used = app_easy_timer(clock_interval*100+adj, app_clock_timer_cb);
 
 	int stat = clock_update(clock_interval);
 	clock_print();
+
+	if(app_connection_idx!=-1){
+		clock_push();
+	}
 
 	int flags = UPDATE_FLY;
 	if(stat>=3){
@@ -221,6 +257,13 @@ static void app_clock_timer_cb(void)
 	if(stat>0 || flags&DRAW_BT){
 		clock_draw(flags);
 	}
+}
+
+
+void app_clock_timer_restart(void)
+{
+	app_easy_timer_cancel(app_clock_timer_used);
+	app_clock_timer_used = app_easy_timer(clock_interval*100, app_clock_timer_cb);
 }
 
 
@@ -317,6 +360,7 @@ void user_app_disconnect(struct gapc_disconnect_ind const *param)
         app_param_update_request_timer_used = EASY_TIMER_INVALID_TIMER;
     }
 
+	app_connection_idx = -1;
 	adv_state = 0;
 
 	if(param->reason!=CO_ERROR_REMOTE_USER_TERM_CON){

@@ -98,6 +98,9 @@ void user_app_on_db_init_complete( void );
 
 void user_app_before_sleep(void);
 
+void app_clock_timer_restart(void);
+
+void clock_fixup_set(int diff_sec, int minutes);
 
 /**
  ****************************************************************************************

@@ -114,6 +114,8 @@ static int jieqi_info[] =
 int year=2025, month=0, date=0, wday=3;
 int l_year=4, l_month=11, l_date=1;
 int hour=0, minute=0, second=0;
+// 上次对时后，经过的分钟数
+int cal_minute=-1;
 
 
 static int get_lunar_mdays(int mon, int *yinfo_out)
@@ -252,6 +254,9 @@ int clock_update(int inc)
 	if((minute%10)==0)
 		retv = 2;
 
+	if(cal_minute>=0)
+		cal_minute += 1;
+
 	if(minute>=60){
 		minute = 0;
 		hour += 1;
@@ -282,17 +287,20 @@ void clock_set(uint8_t *buf)
 	l_date = buf[11]-1;
 
 	get_holiday();
+
+	cal_minute = 0;
+
+	app_clock_timer_restart();
 }
 
 
 void clock_push(void)
 {
-	uint8_t buf[8];
-	struct custs1_val_set_req *req = KE_MSG_ALLOC_DYN(CUSTS1_VAL_SET_REQ, prf_get_task_from_id(TASK_ID_CUSTS1), TASK_APP, custs1_val_set_req, 8);
+	struct custs1_val_set_req *req = KE_MSG_ALLOC_DYN(CUSTS1_VAL_SET_REQ, prf_get_task_from_id(TASK_ID_CUSTS1), TASK_APP, custs1_val_set_req, 11);
 
 	req->conidx = app_env->conidx;
 	req->handle = SVC1_IDX_LONG_VALUE_VAL;
-	req->length = 8;
+	req->length = 11;
 	req->value[0] = year&0xff;
 	req->value[1] = year>>8;
 	req->value[2] = month;
@@ -300,7 +308,10 @@ void clock_push(void)
 	req->value[4] = hour;
 	req->value[5] = minute;
 	req->value[6] = second;
-	req->value[7] = 0;
+	req->value[7] = (cal_minute&0xff);
+	req->value[8] = (cal_minute>>8 )&0xff;
+	req->value[9] = (cal_minute>>16)&0xff;
+	req->value[10]= (cal_minute>>24)&0xff;
 	KE_MSG_SEND(req);
 }
 
@@ -632,6 +643,14 @@ void user_svc1_long_val_wr_ind_handler(ke_msg_id_t const msgid, struct custs1_va
 		clock_set((uint8_t*)param->value);
 		clock_draw(DRAW_BT|UPDATE_FAST);
 		clock_print();
+	}else if(param->value[0]==0x92){
+		int diff_sec;
+		diff_sec  = param->value[1];
+		diff_sec |= param->value[2]<<8;
+		diff_sec  = (diff_sec<<16)>>16;
+		printk("Calibration: %02x\n", diff_sec);
+		clock_fixup_set(diff_sec, cal_minute);
+		cal_minute = 0;
 	}else if(param->value[0]>=0xa0){
 		ota_handle((u8*)param->value);
 	}

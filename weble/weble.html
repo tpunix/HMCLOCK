@@ -9,6 +9,7 @@
 	<button id="connect-button">连接</button>
 	<button id="setime-button" disabled>对时</button>
 	<button id="upfirm-button" disabled>升级</button>
+	<button id="calibration-button" disabled>校准</button>
 	<div id="device_name"></div>
 	<div id="current_voltage"></div>
 	<div id="current_time"></div>
@@ -90,6 +91,7 @@
 				connected = true;
 				document.getElementById('setime-button').disabled = false;
 				document.getElementById('upfirm-button').disabled = false;
+				document.getElementById('calibration-button').disabled = false;
 				document.getElementById('connect-button').textContent = "断开";
 			} catch (error) {
 				console.log('连接失败:', error);
@@ -102,6 +104,13 @@
 
 		async function onSetTime() {
 			document.getElementById('setime-button').disabled = true;
+
+			// 等待整秒时间
+			while(true){
+				const tm_ms = Date.now();
+				if((tm_ms%1000)==0)
+					break;
+			}
 
 			var today = new Date();
 			year = today.getFullYear();
@@ -269,6 +278,65 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+		async function onCalibration() {
+			document.getElementById('calibration-button').disabled = true;
+
+			var minute, second, last_minute, cal_minute;
+
+			cur_time = await longValue.readValue();
+			last_minute = cur_time.getUint8(5);
+			cal_minute = cur_time.getInt32(7, true);
+			console.log('对时后'+cal_minute+'分钟');
+			if(cal_minute==-1){
+				console.log('请先对时!');
+			}else if(cal_minute<2880){
+				console.log('对时与校准间隔太短(小于两天)!');
+			}else{
+				console.log('等待分钟跳变......');
+				while(true) {
+					cur_time = await longValue.readValue();
+					minute = cur_time.getUint8(5);
+					if(minute != last_minute)
+						break;
+					last_minute = minute;
+				}
+				second = cur_time.getUint8(6);
+
+				var today = new Date();
+				var sys_minute = today.getMinutes();
+				var sys_second = today.getSeconds();
+
+				console.log('设备时间: '+minute+'分'+second+'秒');
+				console.log('系统时间: '+sys_minute+'分'+sys_second+'秒');
+
+				if(minute>sys_minute){
+					if(minute-sys_minute>50)
+						sys_minute += 60;
+				}else{
+					if(sys_minute-minute>50)
+						minute += 60;
+				}
+
+				var diff = (minute*60+second)-(sys_minute*60+sys_second);
+				console.log('时间差: '+diff+'秒');
+
+				var buf = new Uint8Array(4);
+				buf[0] = 0x92;
+				buf[1] = diff%256;
+				buf[2] = diff/256;
+				buf[3] = 0x00;
+				await longValue.writeValue(buf);
+
+				console.log('校准完成');
+			}
+
+			document.getElementById('calibration-button').disabled = false;
+		}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 		function disconnect() {
 			document.getElementById('setime-button').disabled = true;
 			if(!device)
@@ -284,12 +352,14 @@
 			console.log('设备已断开连接');
 			connected = false;
 			document.getElementById('setime-button').disabled = true;
+			document.getElementById('calibration-button').disabled = true;
 			document.getElementById('connect-button').textContent = "连接";
 		}
 
 		document.getElementById('connect-button').addEventListener('click', onClick);
 		document.getElementById('setime-button').addEventListener('click', onSetTime);
 		document.getElementById('upfirm-button').addEventListener('click', onUpdate);
+		document.getElementById('calibration-button').addEventListener('click', onCalibration);
 	</script>
 </body>
 </html>
