@@ -101,6 +101,9 @@
         <button id="send90-button" class="bg-secondary text-white px-5 py-2.5 rounded-lg flex items-center gap-2 btn-hover font-medium opacity-50 cursor-not-allowed" disabled>
           <i class="fa fa-send"></i> 切换时制
         </button>
+        <button id="calibration-button" class="bg-secondary text-white px-5 py-2.5 rounded-lg flex items-center gap-2 btn-hover font-medium opacity-50 cursor-not-allowed" disabled>
+          <i class="fa fa-wrench"></i> 时间校准
+        </button>
       </div>
       
       <!-- 设备信息区域 -->
@@ -358,9 +361,11 @@
         document.getElementById('setime-button').disabled = false;
         document.getElementById('upfirm-button').disabled = false;
         document.getElementById('send90-button').disabled = false;
+        document.getElementById('calibration-button').disabled = false;
         document.getElementById('setime-button').classList.remove('opacity-50', 'cursor-not-allowed');
         document.getElementById('upfirm-button').classList.remove('opacity-50', 'cursor-not-allowed');
         document.getElementById('send90-button').classList.remove('opacity-50', 'cursor-not-allowed');
+        document.getElementById('calibration-button').classList.remove('opacity-50', 'cursor-not-allowed');
         
         connectButton.innerHTML = '<i class="fa fa-disconnect"></i> 断开连接';
         connectButton.disabled = false;
@@ -377,8 +382,14 @@
       setimeButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 同步中...';
       
       try {
-        let now = new Date();
+        // 等待整秒时间
+        while(true){
+          const tm_ms = Date.now();
+          if((tm_ms%1000)==0)
+            break;
+		}
 
+        let now = new Date();
         let year = now.getFullYear(),
             month = now.getMonth(),
             mday = now.getDate(),
@@ -556,6 +567,61 @@
       }
     }
 
+	async function onCalibration() {
+		document.getElementById('calibration-button').disabled = true;
+
+		var minute, second, last_minute, cal_minute;
+
+		cur_time = await longValue.readValue();
+		last_minute = cur_time.getUint8(5);
+		cal_minute = cur_time.getInt32(7, true);
+		console.log('对时后'+cal_minute+'分钟');
+
+        console.log('等待分钟跳变......');
+        while(true) {
+          cur_time = await longValue.readValue();
+          minute = cur_time.getUint8(5);
+            if(minute != last_minute)
+              break;
+                last_minute = minute;
+        }
+        second = cur_time.getUint8(6);
+
+        var today = new Date();
+        var sys_minute = today.getMinutes();
+        var sys_second = today.getSeconds();
+        console.log('设备时间: '+minute+'分'+second+'秒');
+        console.log('系统时间: '+sys_minute+'分'+sys_second+'秒');
+
+		if(cal_minute==-1){
+			console.log('请先对时!');
+		}else if(cal_minute<2880){
+			console.log('对时与校准间隔太短(小于两天)!');
+		}else{
+
+			if(minute>sys_minute){
+				if(minute-sys_minute>50)
+					sys_minute += 60;
+			}else{
+				if(sys_minute-minute>50)
+					minute += 60;
+			}
+
+			var diff = (minute*60+second)-(sys_minute*60+sys_second);
+			console.log('时间差: '+diff+'秒');
+
+			var buf = new Uint8Array(4);
+			buf[0] = 0x92;
+			buf[1] = diff%256;
+			buf[2] = diff/256;
+			buf[3] = 0x00;
+			await longValue.writeValue(buf);
+
+			console.log('校准完成');
+		}
+		document.getElementById('calibration-button').disabled = false;
+	}
+
     // 断开连接
     function disconnect() {
       const connectButton = document.getElementById('connect-button');
@@ -565,10 +631,11 @@
       document.getElementById('setime-button').disabled = true;
       document.getElementById('send90-button').disabled = true;
       document.getElementById('upfirm-button').disabled = true;
-      
+      document.getElementById('calibration-button').disabled = true; 
       document.getElementById('setime-button').classList.add('opacity-50', 'cursor-not-allowed');
       document.getElementById('upfirm-button').classList.add('opacity-50', 'cursor-not-allowed');
       document.getElementById('send90-button').classList.add('opacity-50', 'cursor-not-allowed');
+      document.getElementById('calibration-button').classList.add('opacity-50', 'cursor-not-allowed');
 
       // 清除设备时间更新定时器
       if (deviceTimeInterval) {
@@ -604,6 +671,7 @@
     document.getElementById('setime-button').addEventListener('click', onSetTime);
     document.getElementById('upfirm-button').addEventListener('click', onUpdate);
     document.getElementById('send90-button').addEventListener('click', onSend90);
+    document.getElementById('calibration-button').addEventListener('click', onCalibration);
   </script>
 </body>
 </html>
