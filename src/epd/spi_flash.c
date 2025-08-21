@@ -182,7 +182,7 @@ int sf_sector_erase(int cmd, int addr, int wait)
 
 	FSPI_CS(0);
 	fspi_delay();
-	fspi_trans(0x20);
+	fspi_trans(cmd);
 	fspi_trans((addr>>16)&0xff);
 	fspi_trans((addr>> 8)&0xff);
 	fspi_trans((addr>> 0)&0xff);
@@ -537,6 +537,7 @@ int ota_handle(u8 *buf)
 		int addr = firm_addr+(ota_state-1)*256;
 		sf_page_write(addr, ota_buf, 256);
 		int status = sf_wait();
+
 		ota_state += 1;
 	}else if(buf[0]==0xa4){
 		ota_state = 0;
