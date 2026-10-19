@@ -136,18 +136,18 @@ void epd_window(int x1, int y1, int x2, int y2)
 {
 	int tmp;
 
-	x1 = x1&~0x07;
-	x2 = x2&~0x07;
-	win_w = x2-x1+8;
+	fb_w = (x2-x1)+1;
+	fb_h = (y2-y1)+1;
+	x1 = x1/8;
+	x2 = x2/8;
+	win_w = (x2-x1+1)*8;
 	win_h = y2-y1+1;
 
 	int rmode = scr_mode&3;
-	if(rmode==0 || rmode==2){
-		fb_w = win_w;
-		fb_h = win_h;
-	}else{
-		fb_w = win_h;
-		fb_h = win_w;
+	if(rmode==1 || rmode==3){
+		tmp = fb_w;
+		fb_w = fb_h;
+		fb_h = tmp;
 	}
 
 	//printk("epd_window: win: %d x %d  fb: %d x %d\n", win_w, win_h, fb_w, fb_h);
@@ -168,15 +168,15 @@ void epd_window(int x1, int y1, int x2, int y2)
 	int xinc = (x2>x1)? 1: 0;
 	int yinc = (y2>y1)? 1: 0;
 
-	epd_cmd2(0x0f, y1-1, (y1-1)>>8);
-	epd_cmd3(0x01, y2-1, (y2-1)>>8, 0x00);  // Gate Driver output control
+	epd_cmd2(0x0f, y1, y1>>8);
+	epd_cmd3(0x01, y2, y2>>8, 0x00);  // Gate Driver output control
 
 	epd_cmd(0x11);  // data entry mode
 	epd_data((yinc<<1)|xinc);
 
 	epd_cmd(0x44);  // set Ram-X address start/end position
-	epd_data(x1>>3);
-	epd_data(x2>>3);
+	epd_data(x1);
+	epd_data(x2);
 
 	epd_cmd(0x45);  // set Ram-Y address start/end position
 	epd_data(y1&0xff);
@@ -185,7 +185,7 @@ void epd_window(int x1, int y1, int x2, int y2)
 	epd_data(y2>>8);
 
 	epd_cmd(0x4e);  // set RAM-x address
-	epd_data(x1>>3);
+	epd_data(x1);
 	epd_cmd(0x4f);  // set RAM-y address
 	epd_data(y1&0xff);
 	epd_data(y1>>8);
@@ -202,6 +202,18 @@ void epd_pos(int x, int y)
 	epd_data(y>>8);
 }
 
+
+int epd_temp(void)
+{
+	int temp;
+	u8 buf[2];
+
+	epd_cmd_read(0x1b, buf, 2);
+	temp = (buf[0]<<8)|buf[1];
+	temp += 0x0080;
+	temp >>= 8;
+	return temp;
+}
 
 
 void epd_load_lut(u8 *lut)
@@ -336,7 +348,7 @@ void epd_update(void)
 		}else{
 			epd_load_lut(lut_fly);
 		}
-		seq = 0xc7;
+		seq = 0xe7;
 	}
 
 	epd_cmd1(0x22, seq);

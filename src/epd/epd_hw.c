@@ -189,7 +189,7 @@ void epd_cmd1(int cmd, int d0)
 	epd_spi_write(cmd);
 	EPD_DC(1);
 	epd_spi_write(d0);
-	EPD_CS(0);
+	EPD_CS(1);
 }
 
 
@@ -201,7 +201,7 @@ void epd_cmd2(int cmd, int d0, int d1)
 	EPD_DC(1);
 	epd_spi_write(d0);
 	epd_spi_write(d1);
-	EPD_CS(0);
+	EPD_CS(1);
 }
 
 
@@ -214,7 +214,7 @@ void epd_cmd3(int cmd, int d0, int d1, int d2)
 	epd_spi_write(d0);
 	epd_spi_write(d1);
 	epd_spi_write(d2);
-	EPD_CS(0);
+	EPD_CS(1);
 }
 
 
@@ -228,7 +228,7 @@ void epd_cmd4(int cmd, int d0, int d1, int d2, int d3)
 	epd_spi_write(d1);
 	epd_spi_write(d2);
 	epd_spi_write(d3);
-	EPD_CS(0);
+	EPD_CS(1);
 }
 
 

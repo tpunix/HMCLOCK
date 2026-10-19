@@ -337,7 +337,12 @@
             hour = cur_time.getUint8(4),
             minute = cur_time.getUint8(5),
             second = cur_time.getUint8(6);
-        
+
+		cal_minute = cur_time.getInt32(7, true);
+		console.log('对时后'+cal_minute+'分钟');
+		fixup_value = cur_time.getInt16(11, true),
+		console.log('时钟修正值'+fixup_value);
+
         // 保存设备时间基准值和当前时间戳
         deviceTimeBase = {
           year, month, mday, hour, minute, second,

@@ -56,6 +56,7 @@ void epd_window(int x1, int y1, int x2, int y2);
 void epd_screen_update(void);
 void epd_screen_clean(int mode);
 int  epd_detect(void);
+int  epd_temp(void);
 
 
 extern u8 lut_p[];
