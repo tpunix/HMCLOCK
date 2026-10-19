@@ -66,6 +66,7 @@ uint16_t non_db_val_counter __SECTION_ZERO("retention_mem_area0"); //@RETENTION 
 int adcval;
 
 static uint8_t h24_format = 1; // 24小时制标志
+static int tempreture = 25;
 
 static void get_holiday(void);
 
@@ -454,7 +455,7 @@ void clock_push(void)
 
 	req->conidx = app_env->conidx;
 	req->handle = SVC1_IDX_LONG_VALUE_VAL;
-	req->length = 11;
+	req->length = 13;
 	req->value[0] = year&0xff;
 	req->value[1] = year>>8;
 	req->value[2] = month;
@@ -466,6 +467,8 @@ void clock_push(void)
 	req->value[8] = (cal_minute>>8 )&0xff;
 	req->value[9] = (cal_minute>>16)&0xff;
 	req->value[10]= (cal_minute>>24)&0xff;
+	req->value[11] = (clock_fixup_value&0xff);
+	req->value[12] = (clock_fixup_value>>8 )&0xff;
 	KE_MSG_SEND(req);
 }
 
@@ -734,15 +737,15 @@ typedef struct {
 
 LAYOUT layouts[3] = {
 	{212, 104, 0, 1,
-		{15, 172, 190,  16,  12,  98, 150, 12},
+		{15, 172, 190,  16,  12,  90, 176, 12},
 		{ 6,   7,  14,  27,  82,  82,  82, 44},
 	},
 	{250, 122, 2, 3,
-		{15, 206, 226,  12,  12, 118, 176, 15},
+		{15, 206, 226,  12,  12, 106, 206, 15},
 		{ 6,   8,  15,  28,  98,  98,  98, 50},
 	},
 	{296, 128, 2, 3,
-		{15, 246, 268,  30,  12, 140, 220, 15,},
+		{15, 246, 268,  30,  12, 128, 248, 15,},
 		{ 6,   8,  15,  30, 102, 102, 102, 52,},
 	},
 };
@@ -784,6 +787,8 @@ static void epd_wait_timer(void)
     }else{
         // 屏幕更新完成
         epd_wait_hnd = EASY_TIMER_INVALID_TIMER;
+		// 读取温度值
+		tempreture = epd_temp();
         // 发送深度睡眠命令
         epd_cmd1(0x10, 0x01);
         // 关闭电源
@@ -922,15 +927,24 @@ void clock_draw(int flags)
 	// 显示农历日期(不显示年)
 	ldate_str(tbuf);
 	draw_text(lt->x[4], lt->y[4], tbuf, BLACK);
-	// 显示节气
-	if(jieqi_str)
-		draw_text(lt->x[5], lt->y[5], jieqi_str, BLACK);
-	// 显示节假日
+
 	if(flags&DRAW_BT){
-		draw_text(lt->x[6], lt->y[6], bt_id, BLACK);
+		draw_text(lt->x[5], lt->y[5], bt_id, BLACK);
+	}else if(jieqi_str && holiday_str){
+		// 显示节气和节假日
+		sprintf(tbuf, "%s/%s", jieqi_str, holiday_str);
+		draw_text(lt->x[5], lt->y[5], tbuf, BLACK);
+	}else if(jieqi_str){
+		// 显示节气
+		draw_text(lt->x[5], lt->y[5], jieqi_str, BLACK);
 	}else if(holiday_str){
-		draw_text(lt->x[6], lt->y[6], holiday_str, BLACK);
+		// 显示节假日
+		draw_text(lt->x[5], lt->y[5], holiday_str, BLACK);
 	}
+
+	// 显示温度
+	sprintf(tbuf, "%d°C", tempreture);
+	draw_text(lt->x[6], lt->y[6], tbuf, BLACK);
 
 	// 墨水屏更新显示
 	epd_init();
